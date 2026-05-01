@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/abstract_logo"
+        android:label="Abstract IDE"
+        android:theme="@style/Theme.AbstractIDE">
+
+        <!-- СТАРТОВЫЙ ЭКРАН (Portrait) - ЗАПУСКАЕТСЯ ПЕРВЫМ -->
+        <activity
+            android:name=".ui.project.StartActivity"
+            android:screenOrientation="portrait"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ГЛАВНЫЙ ЭКРАН (Landscape) -->
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
+    </application>
+
+</manifest>

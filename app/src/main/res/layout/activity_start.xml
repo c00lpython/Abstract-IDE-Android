@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1e1e1e"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="40dp">
+
+    <ImageView
+        android:layout_width="128dp"
+        android:layout_height="128dp"
+        android:src="@drawable/abstract_logo"
+        android:scaleType="centerCrop"
+        android:clipToOutline="true"
+        android:background="@drawable/logo_rounded_bg" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Abstract IDE"
+        android:textColor="#3d5afe"
+        android:textSize="48sp"
+        android:textStyle="bold"
+        android:layout_marginTop="20dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Visual Programming Environment"
+        android:textColor="#888888"
+        android:textSize="16sp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="40dp" />
+
+    <Button
+        android:id="@+id/btnNewProject"
+        android:layout_width="280dp"
+        android:layout_height="50dp"
+        android:text="New Project"
+        android:textColor="#ffffff"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:background="@drawable/btn_primary_rounded"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btnOpenProject"
+        android:layout_width="280dp"
+        android:layout_height="50dp"
+        android:text="Open Project"
+        android:textColor="#3d5afe"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:background="@drawable/btn_outline_rounded"
+        android:layout_marginBottom="30dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#3a3a3a"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Recent Projects"
+        android:textColor="#dddddd"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="10dp" />
+
+    <ListView
+        android:id="@+id/listRecentProjects"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#252525"
+        android:divider="#3a3a3a"
+        android:dividerHeight="1dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Abstract IDE v1.0.0"
+        android:textColor="#666666"
+        android:textSize="10sp"
+        android:layout_marginTop="10dp" />
+
+</LinearLayout>

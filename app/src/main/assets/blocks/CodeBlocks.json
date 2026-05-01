@@ -1,0 +1,493 @@
+{
+  "block_classes": {
+    "DataTypes": {
+      "description": "Типы данных и их методы",
+      "color": "#9b59b6",
+      "subclasses": {
+        "List": {
+          "description": "Список",
+          "color": "#3498db",
+          "type": "constructor",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 120,
+            "item_height": 50,
+            "spacing": 5,
+            "max_items": 20,
+            "accepts_types": ["any"],
+            "container_type": "list"
+          },
+          "properties": {
+            "variable": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "Dict": {
+          "description": "Словарь",
+          "color": "#e67e22",
+          "type": "constructor",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 140,
+            "item_height": 70,
+            "spacing": 5,
+            "max_items": 20,
+            "accepts_types": ["key_value"],
+            "container_type": "dictionary",
+            "supports_pairs": true,
+            "key_color": "#e67e22",
+            "value_color": "#27ae60"
+          },
+          "properties": {
+            "variable": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "String": {
+          "description": "Строка",
+          "color": "#e74c3c",
+          "type": "constructor",
+          "properties": {
+            "value": {"type": "string", "description": "Значение", "default": ""},
+            "variable": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "Integer": {
+          "description": "Целое число",
+          "color": "#3498db",
+          "type": "constructor",
+          "properties": {
+            "value": {"type": "integer", "description": "Значение", "default": 0},
+            "variable": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "Float": {
+          "description": "Дробное число",
+          "color": "#2ecc71",
+          "type": "constructor",
+          "properties": {
+            "value": {"type": "number", "description": "Значение", "default": 0.0},
+            "variable": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "Boolean": {
+          "description": "Логическое значение",
+          "color": "#e67e22",
+          "type": "constructor",
+          "properties": {
+            "value": {"type": "boolean", "description": "True/False", "default": false},
+            "variable": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        }
+      }
+    },
+    
+    "DictOperations": {
+      "description": "Операции со словарями",
+      "color": "#e67e22",
+      "subclasses": {
+        "DictGet": {
+          "description": "Получить значение по ключу",
+          "color": "#f39c12",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "key": {"type": "any", "description": "Ключ", "required": true},
+            "default": {"type": "any", "description": "Значение по умолчанию"},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "DictSet": {
+          "description": "Установить значение по ключу",
+          "color": "#e74c3c",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "key": {"type": "any", "description": "Ключ", "required": true},
+            "value": {"type": "any", "description": "Значение", "required": true}
+          }
+        },
+        "DictKeys": {
+          "description": "Получить все ключи",
+          "color": "#3498db",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "DictValues": {
+          "description": "Получить все значения",
+          "color": "#2ecc71",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "DictItems": {
+          "description": "Получить все пары ключ-значение",
+          "color": "#9b59b6",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "DictContains": {
+          "description": "Проверить наличие ключа",
+          "color": "#e67e22",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "key": {"type": "any", "description": "Ключ", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "DictLength": {
+          "description": "Получить размер словаря",
+          "color": "#95a5a6",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "DictClear": {
+          "description": "Очистить словарь",
+          "color": "#e74c3c",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true}
+          }
+        },
+        "DictCopy": {
+          "description": "Копировать словарь",
+          "color": "#3498db",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "DictUpdate": {
+          "description": "Обновить словарь",
+          "color": "#2ecc71",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "other": {"type": "any", "description": "Другой словарь", "required": true}
+          }
+        },
+        "DictPop": {
+          "description": "Удалить и вернуть значение по ключу",
+          "color": "#e74c3c",
+          "type": "operation",
+          "properties": {
+            "dictionary": {"type": "any", "description": "Словарь", "required": true},
+            "key": {"type": "any", "description": "Ключ", "required": true},
+            "default": {"type": "any", "description": "Значение по умолчанию"},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        }
+      }
+    },
+    
+    "Functions": {
+      "description": "Функции",
+      "color": "#16a085",
+      "subclasses": {
+        "Function": {
+          "description": "Определение функции",
+          "color": "#3498db",
+          "type": "definition",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 140,
+            "item_height": 50,
+            "spacing": 5,
+            "max_items": 50,
+            "accepts_types": ["statement"],
+            "container_type": "function"
+          },
+          "properties": {
+            "name": {"type": "string", "description": "Имя функции", "required": true}
+          }
+        }
+      }
+    },
+    
+    "ControlFlow": {
+      "description": "Управление потоком",
+      "color": "#2980b9",
+      "subclasses": {
+        "If": {
+          "description": "Условный оператор",
+          "color": "#e74c3c",
+          "type": "control",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 140,
+            "item_height": 50,
+            "spacing": 5,
+            "max_items": 50,
+            "accepts_types": ["statement"],
+            "container_type": "if"
+          },
+          "properties": {
+            "condition": {"type": "any", "description": "Условие", "required": true}
+          }
+        },
+        "Else": {
+          "description": "Иначе",
+          "color": "#95a5a6",
+          "type": "control",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 140,
+            "item_height": 50,
+            "spacing": 5,
+            "max_items": 50,
+            "accepts_types": ["statement"],
+            "container_type": "else"
+          },
+          "properties": {}
+        },
+        "For": {
+          "description": "Цикл for",
+          "color": "#3498db",
+          "type": "control",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 140,
+            "item_height": 50,
+            "spacing": 5,
+            "max_items": 50,
+            "accepts_types": ["statement"],
+            "container_type": "for"
+          },
+          "properties": {
+            "variable": {"type": "string", "description": "Переменная цикла", "required": true},
+            "iterable": {"type": "any", "description": "Последовательность", "required": true}
+          }
+        },
+        "While": {
+          "description": "Цикл while",
+          "color": "#9b59b6",
+          "type": "control",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 140,
+            "item_height": 50,
+            "spacing": 5,
+            "max_items": 50,
+            "accepts_types": ["statement"],
+            "container_type": "while"
+          },
+          "properties": {
+            "condition": {"type": "any", "description": "Условие", "required": true}
+          }
+        },
+        "Switch": {
+          "description": "Оператор множественного выбора",
+          "color": "#f39c12",
+          "type": "control",
+          "is_container": true,
+          "container_config": {
+            "orientation": "vertical",
+            "item_width": 200,
+            "item_height": 60,
+            "spacing": 5,
+            "max_items": 30,
+            "accepts_types": ["case"],
+            "container_type": "switch",
+            "supports_cases": true,
+            "case_config": {
+              "case_width": 180,
+              "case_height": 50,
+              "case_color": "#2ecc71",
+              "default_case_color": "#95a5a6",
+              "break_auto": true
+            }
+          },
+          "properties": {
+            "value": {"type": "any", "description": "Выражение для сравнения", "required": true}
+          }
+        },
+        "Case": {
+          "description": "Вариант для switch",
+          "color": "#2ecc71",
+          "type": "control",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 140,
+            "item_height": 50,
+            "spacing": 5,
+            "max_items": 50,
+            "accepts_types": ["statement"],
+            "container_type": "case"
+          },
+          "properties": {
+            "pattern": {"type": "any", "description": "Значение для сравнения", "required": true},
+            "is_default": {"type": "boolean", "description": "Вариант по умолчанию", "default": false}
+          }
+        }
+      }
+    },
+    
+    "MathOperations": {
+      "description": "Математические операции",
+      "color": "#34495e",
+      "subclasses": {
+        "Operation": {
+          "description": "Математическая операция",
+          "color": "#3498db",
+          "type": "operator",
+          "droplist": {
+            "enabled": true,
+            "options": ["+", "-", "*", "/", "//", "%", "**"],
+            "default": "+"
+          },
+          "properties": {
+            "left": {"type": "any", "description": "Левый операнд", "required": true},
+            "right": {"type": "any", "description": "Правый операнд", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        }
+      }
+    },
+    
+    "ComparisonOperations": {
+      "description": "Операции сравнения",
+      "color": "#e67e22",
+      "subclasses": {
+        "Compare": {
+          "description": "Сравнение",
+          "color": "#f39c12",
+          "type": "comparison",
+          "droplist": {
+            "enabled": true,
+            "options": ["==", "!=", ">", "<", ">=", "<="],
+            "default": "=="
+          },
+          "properties": {
+            "left": {"type": "any", "description": "Левый операнд", "required": true},
+            "right": {"type": "any", "description": "Правый операнд", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        }
+      }
+    },
+    
+    "LogicOperations": {
+      "description": "Логические операции",
+      "color": "#8e44ad",
+      "subclasses": {
+        "Logic": {
+          "description": "Логическая операция",
+          "color": "#9b59b6",
+          "type": "logic",
+          "droplist": {
+            "enabled": true,
+            "options": ["and", "or", "not"],
+            "default": "and"
+          },
+          "properties": {
+            "left": {"type": "any", "description": "Левый операнд"},
+            "right": {"type": "any", "description": "Правый операнд"},
+            "operand": {"type": "any", "description": "Операнд"},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        }
+      }
+    },
+    
+    "BitOperations": {
+      "description": "Битовые операции",
+      "color": "#16a085",
+      "subclasses": {
+        "Bitwise": {
+          "description": "Битовая операция",
+          "color": "#1abc9c",
+          "type": "bitwise",
+          "droplist": {
+            "enabled": true,
+            "options": ["&", "|", "^", "~", "<<", ">>"],
+            "default": "&"
+          },
+          "properties": {
+            "left": {"type": "integer", "description": "Левый операнд"},
+            "right": {"type": "integer", "description": "Правый операнд"},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        }
+      }
+    },
+    
+    "Builtins": {
+      "description": "Встроенные функции",
+      "color": "#2c3e50",
+      "subclasses": {
+        "Print": {
+          "description": "Вывод в консоль",
+          "color": "#e74c3c",
+          "type": "function",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 100,
+            "item_height": 50,
+            "spacing": 8,
+            "max_items": 20,
+            "accepts_types": ["any"],
+            "container_type": "print"
+          },
+          "properties": {
+            "sep": {"type": "string", "description": "Разделитель", "default": " "},
+            "end": {"type": "string", "description": "Окончание", "default": "\\n"}
+          }
+        },
+        "Input": {
+          "description": "Ввод с клавиатуры",
+          "color": "#2ecc71",
+          "type": "function",
+          "properties": {
+            "prompt": {"type": "string", "description": "Приглашение", "default": ""},
+            "target": {"type": "string", "description": "Сохранить в", "required": true}
+          }
+        },
+        "Range": {
+          "description": "Диапазон чисел",
+          "color": "#3498db",
+          "type": "function",
+          "properties": {
+            "start": {"type": "integer", "description": "Начало", "default": 0},
+            "stop": {"type": "integer", "description": "Конец", "required": true},
+            "step": {"type": "integer", "description": "Шаг", "default": 1},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        },
+        "Type": {
+          "description": "Преобразование типа",
+          "color": "#34495e",
+          "type": "function",
+          "droplist": {
+            "enabled": true,
+            "options": ["int", "float", "str", "bool", "list", "dict"],
+            "default": "str"
+          },
+          "properties": {
+            "value": {"type": "any", "description": "Значение", "required": true},
+            "target": {"type": "string", "description": "Сохранить в", "default": ""}
+          }
+        }
+      }
+    }
+  }
+}

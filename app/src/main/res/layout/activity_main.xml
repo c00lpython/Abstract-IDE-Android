@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1e1e1e"
+    tools:ignore="HardcodedText,ContentDescription,SmallSp,NestedWeights,ButtonStyle">
+
+    <!-- MENU BAR -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:background="#1e1e1e"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/menuFile"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:text="File ▾"
+            android:textColor="#cccccc"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/menuEdit"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:text="Edit ▾"
+            android:textColor="#cccccc"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/menuView"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:text="View ▾"
+            android:textColor="#cccccc"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/btnBuild"
+            android:layout_width="40dp"
+            android:layout_height="28dp"
+            android:text="▶"
+            android:textColor="#ffffff"
+            android:textSize="10sp"
+            android:background="@drawable/btn_success_rounded"
+            android:layout_marginEnd="3dp" />
+
+        <Button
+            android:id="@+id/btnRun"
+            android:layout_width="40dp"
+            android:layout_height="28dp"
+            android:text="⚡"
+            android:textColor="#ffffff"
+            android:textSize="12sp"
+            android:background="@drawable/btn_primary_rounded" />
+
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#333333" />
+
+    <!-- MAIN AREA -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <!-- Explorer -->
+        <LinearLayout
+            android:layout_width="160dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:background="#252525">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="28dp"
+                android:text="EXPLORER"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="8dp"
+                android:background="#2a2a2a" />
+
+            <androidx.fragment.app.FragmentContainerView
+                android:id="@+id/fragmentExplorer"
+                android:name="com.xcore.abstractide.ui.explorer.ProjectExplorerFragment"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+        </LinearLayout>
+
+        <!-- Canvas -->
+        <com.xcore.abstractide.ui.canvas.BlockCanvasView
+            android:id="@+id/canvasView"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#3c3c3c" />
+
+        <!-- Right Panel -->
+        <LinearLayout
+            android:layout_width="200dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:background="#252525">
+
+            <!-- Palette -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:text="BLOCK PALETTE"
+                    android:textColor="#888888"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="8dp"
+                    android:background="#2a2a2a" />
+
+                <!-- Tabs -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:orientation="horizontal"
+                    android:background="#2a2a2a">
+
+                    <Button
+                        android:id="@+id/tabNew"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:text="NEW"
+                        android:textColor="#3d5afe"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:background="@android:color/transparent" />
+
+                    <Button
+                        android:id="@+id/tabCreated"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:text="CREATED"
+                        android:textColor="#888888"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:background="@android:color/transparent" />
+                </LinearLayout>
+
+                <SearchView
+                    android:id="@+id/searchPalette"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:background="#3a3a3a"
+                    android:queryHint="Search..."
+                    android:iconifiedByDefault="false" />
+
+                <androidx.fragment.app.FragmentContainerView
+                    android:id="@+id/fragmentPalette"
+                    android:name="com.xcore.abstractide.ui.palette.BlockPaletteFragment"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+            </LinearLayout>
+
+            <!-- Properties -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="100dp"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="8dp"
+                    android:background="#2a2a2a"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="PROPERTIES"
+                        android:textColor="#888888"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btnEditProperties"
+                        android:layout_width="24dp"
+                        android:layout_height="20dp"
+                        android:text="✎"
+                        android:textColor="#888888"
+                        android:textSize="10sp"
+                        android:background="@android:color/transparent"
+                        android:padding="0dp" />
+
+                </LinearLayout>
+
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#252525"
+                    android:padding="6dp">
+
+                    <LinearLayout
+                        android:id="@+id/propertiesContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvProperties"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Select a block"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+
+                    </LinearLayout>
+                </ScrollView>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- TERMINAL -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:orientation="vertical"
+        android:background="#1a1a1a">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
+            android:background="#222222"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="TERMINAL"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnFullscreen"
+                android:layout_width="24dp"
+                android:layout_height="20dp"
+                android:text="⛶"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:background="@android:color/transparent"
+                android:padding="0dp" />
+
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="4dp">
+
+            <TextView
+                android:id="@+id/tvTerminal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ready.\n"
+                android:textColor="#00ff88"
+                android:textSize="10sp"
+                android:typeface="monospace" />
+
+        </ScrollView>
+    </LinearLayout>
+
+</LinearLayout>

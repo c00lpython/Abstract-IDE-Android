@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "description": "Правила трансляции блоков в Python код",
+  
+  "indent": "    ",
+  "newline": "\n",
+  
+  "blocks": {
+    "Builtins.Input": {
+      "template": "{target} = input({prompt})",
+      "indent": false,
+      "properties": {
+        "prompt": "prompt",
+        "target": "target"
+      }
+    },
+    
+    "Reference.call_username": {
+      "template": "{name}",
+      "indent": false,
+      "is_reference": true,
+      "properties": {
+        "name": "name"
+      }
+    },
+    
+    "DataTypes.Variable": {
+      "template": "{name} = {value}",
+      "indent": false,
+      "properties": {
+        "name": "name",
+        "value": "value"
+      }
+    },
+    
+    "Builtins.Print": {
+      "template": "print({values}, sep={sep}, end={end})",
+      "indent": false,
+      "properties": {
+        "values": "values",
+        "sep": "sep",
+        "end": "end"
+      }
+    }
+  }
+}

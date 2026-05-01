@@ -1,0 +1,883 @@
+{
+  "block_classes": {
+    "MainContainers": {
+      "description": "Основные контейнеры",
+      "subclasses": {
+        "Frame": {
+          "description": "Базовый контейнер для группировки элементов",
+          "color": "#3498db",
+          "properties": {
+            "width": {"type": "string", "default": "auto", "description": "Ширина (px, %, auto)"},
+            "height": {"type": "string", "default": "auto", "description": "Высота (px, %, auto)"},
+            "layout": {"type": "enum", "values": ["vertical", "horizontal", "none", "grid"], "default": "vertical"},
+            "padding": {"type": "string", "default": "0", "description": "Внутренние отступы"},
+            "margin": {"type": "string", "default": "0", "description": "Внешние отступы"}
+          },
+          "ports": {
+            "input": ["children", "layoutConfig"],
+            "output": ["size", "layoutInfo"],
+            "inout": ["content"]
+          }
+        },
+        "ScrollingFrame": {
+          "description": "Контейнер с возможностью прокрутки содержимого",
+          "color": "#e74c3c",
+          "properties": {
+            "scrollDirection": {"type": "enum", "values": ["vertical", "horizontal", "both"], "default": "vertical"},
+            "scrollbarVisibility": {"type": "enum", "values": ["auto", "always", "hidden"], "default": "auto"},
+            "scrollSpeed": {"type": "integer", "min": 1, "default": 10, "description": "Скорость прокрутки"}
+          },
+          "ports": {
+            "input": ["content", "scrollPosition"],
+            "output": ["visibleArea", "scrollEvents"],
+            "inout": ["scrollState"]
+          }
+        },
+        "TabContainer": {
+          "description": "Контейнер с вкладками для переключения между разделами",
+          "color": "#2ecc71",
+          "properties": {
+            "tabs": {"type": "array", "items": {"type": "object"}, "description": "Массив вкладок {title, content}"},
+            "activeTabIndex": {"type": "integer", "min": 0, "default": 0},
+            "tabPosition": {"type": "enum", "values": ["top", "bottom", "left", "right"], "default": "top"}
+          },
+          "ports": {
+            "input": ["switchToTab", "tabData"],
+            "output": ["activeContent", "tabChangeEvents"],
+            "inout": ["tabState"]
+          }
+        },
+        "GridContainer": {
+          "description": "Сетка для упорядоченного размещения элементов",
+          "color": "#f39c12",
+          "properties": {
+            "rows": {"type": "integer", "min": 1, "default": 1},
+            "columns": {"type": "integer", "min": 1, "default": 1},
+            "rowGap": {"type": "string", "default": "0", "description": "Отступ между строками"},
+            "columnGap": {"type": "string", "default": "0", "description": "Отступ между колонками"}
+          },
+          "ports": {
+            "input": ["children", "gridConfig"],
+            "output": ["cellInfo", "layoutCalculated"],
+            "inout": ["gridContent"]
+          }
+        },
+        "StackContainer": {
+          "description": "Вертикальный/горизонтальный стек (автоматическое выравнивание)",
+          "color": "#9b59b6",
+          "properties": {
+            "orientation": {"type": "enum", "values": ["vertical", "horizontal"], "default": "vertical"},
+            "spacing": {"type": "string", "default": "0", "description": "Расстояние между элементами"},
+            "alignment": {"type": "enum", "values": ["start", "center", "end", "stretch"], "default": "start"}
+          },
+          "ports": {
+            "input": ["children", "stackOrder"],
+            "output": ["stackLayout", "sizeInfo"],
+            "inout": ["stackContent"]
+          }
+        }
+      }
+    },
+    "InputElements": {
+      "description": "Элементы ввода данных",
+      "subclasses": {
+        "TextInput": {
+          "description": "Поле для ввода текста",
+          "color": "#3498db",
+          "properties": {
+            "placeholder": {"type": "string", "description": "Текст-подсказка"},
+            "maxLength": {"type": "integer", "min": 0, "description": "Максимальная длина"},
+            "value": {"type": "string", "description": "Текущее значение"},
+            "isMultiline": {"type": "boolean", "default": false}
+          },
+          "ports": {
+            "input": ["setValue", "config"],
+            "output": ["change", "focus", "blur"],
+            "inout": ["value"]
+          }
+        },
+        "PasswordInput": {
+          "description": "Поле для ввода пароля (скрывает символы)",
+          "color": "#e74c3c",
+          "properties": {
+            "placeholder": {"type": "string", "description": "Текст-подсказка"},
+            "maskChar": {"type": "string", "default": "•", "description": "Символ маскировки"},
+            "showToggle": {"type": "boolean", "default": true, "description": "Кнопка показа/скрытия"}
+          },
+          "ports": {
+            "input": ["setPassword", "config"],
+            "output": ["change", "validation"],
+            "inout": ["password"]
+          }
+        },
+        "NumberInput": {
+          "description": "Поле для ввода чисел (со стрелками регулировки)",
+          "color": "#2ecc71",
+          "properties": {
+            "min": {"type": "number", "description": "Минимальное значение"},
+            "max": {"type": "number", "description": "Максимальное значение"},
+            "step": {"type": "number", "default": 1, "description": "Шаг изменения"},
+            "value": {"type": "number", "description": "Текущее значение"}
+          },
+          "ports": {
+            "input": ["setValue", "increment", "decrement"],
+            "output": ["change", "valueChange"],
+            "inout": ["value"]
+          }
+        },
+        "DropDown": {
+          "description": "Выпадающий список выбора",
+          "color": "#f39c12",
+          "properties": {
+            "options": {"type": "array", "items": {"type": "object"}, "required": true, "description": "Опции {label, value}"},
+            "selectedValue": {"type": "string", "description": "Выбранное значение"},
+            "isSearchable": {"type": "boolean", "default": false}
+          },
+          "ports": {
+            "input": ["select", "optionsUpdate"],
+            "output": ["selectionChange", "open", "close"],
+            "inout": ["selected"]
+          }
+        },
+        "ComboBox": {
+          "description": "Выпадающий список выбора (альтернативное название)",
+          "color": "#9b59b6",
+          "properties": {
+            "options": {"type": "array", "items": {"type": "object"}, "description": "Опции {label, value}"},
+            "selectedValue": {"type": "string", "description": "Выбранное значение"},
+            "isEditable": {"type": "boolean", "default": true}
+          },
+          "ports": {
+            "input": ["select", "customValue"],
+            "output": ["selectionChange", "customInput"],
+            "inout": ["value"]
+          }
+        },
+        "DatePicker": {
+          "description": "Выбор даты из календаря",
+          "color": "#1abc9c",
+          "properties": {
+            "dateFormat": {"type": "string", "default": "YYYY-MM-DD", "description": "Формат даты"},
+            "minDate": {"type": "string", "format": "date", "description": "Минимальная дата"},
+            "maxDate": {"type": "string", "format": "date", "description": "Максимальная дата"},
+            "value": {"type": "string", "format": "date", "description": "Выбранная дата"}
+          },
+          "ports": {
+            "input": ["setDate", "config"],
+            "output": ["dateChange", "calendarOpen"],
+            "inout": ["selectedDate"]
+          }
+        },
+        "FileInput": {
+          "description": "Загрузка файлов (кнопка + индикатор прогресса)",
+          "color": "#d35400",
+          "properties": {
+            "accept": {"type": "string", "description": "Разрешенные типы файлов (например, image/*,.pdf)"},
+            "multiple": {"type": "boolean", "default": false},
+            "maxFileSize": {"type": "integer", "min": 0, "description": "Максимальный размер файла (байт)"}
+          },
+          "ports": {
+            "input": ["files", "uploadTrigger"],
+            "output": ["fileChange", "uploadProgress", "uploadComplete"],
+            "inout": ["fileList"]
+          }
+        }
+      }
+    },
+    "ButtonsAndSwitches": {
+      "description": "Кнопки и переключатели",
+      "subclasses": {
+        "TextButton": {
+          "description": "Кнопка с текстовой меткой",
+          "color": "#3498db",
+          "properties": {
+            "text": {"type": "string", "required": true, "description": "Текст кнопки"},
+            "isDisabled": {"type": "boolean", "default": false},
+            "variant": {"type": "enum", "values": ["primary", "secondary", "outline", "text"], "default": "primary"}
+          },
+          "ports": {
+            "input": ["clickTrigger", "state"],
+            "output": ["click", "hover", "press"],
+            "inout": ["buttonState"]
+          }
+        },
+        "ImageButton": {
+          "description": "Кнопка с иконкой вместо текста",
+          "color": "#e74c3c",
+          "properties": {
+            "imageUrl": {"type": "string", "required": true, "description": "URL изображения"},
+            "altText": {"type": "string", "description": "Альтернативный текст"},
+            "imageSize": {"type": "string", "default": "24px", "description": "Размер изображения"}
+          },
+          "ports": {
+            "input": ["clickTrigger", "imageUpdate"],
+            "output": ["click", "imageLoaded"],
+            "inout": ["buttonState"]
+          }
+        },
+        "ToggleButton": {
+          "description": "Переключатель «вкл/выкл» (двухсостоятельный)",
+          "color": "#2ecc71",
+          "properties": {
+            "isOn": {"type": "boolean", "default": false},
+            "onText": {"type": "string", "description": "Текст для состояния ON"},
+            "offText": {"type": "string", "description": "Текст для состояния OFF"}
+          },
+          "ports": {
+            "input": ["toggle", "setState"],
+            "output": ["stateChange", "on", "off"],
+            "inout": ["toggleState"]
+          }
+        },
+        "CheckBox": {
+          "description": "Флажок для множественного выбора",
+          "color": "#f39c12",
+          "properties": {
+            "isChecked": {"type": "boolean", "default": false},
+            "label": {"type": "string", "description": "Текст метки"},
+            "isIndeterminate": {"type": "boolean", "default": false}
+          },
+          "ports": {
+            "input": ["check", "uncheck", "toggle"],
+            "output": ["change", "checked", "unchecked"],
+            "inout": ["checkState"]
+          }
+        },
+        "RadioButton": {
+          "description": "Переключатель для единственного выбора в группе",
+          "color": "#9b59b6",
+          "properties": {
+            "isSelected": {"type": "boolean", "default": false},
+            "label": {"type": "string", "description": "Текст метки"},
+            "groupName": {"type": "string", "required": true, "description": "Имя группы радиокнопок"}
+          },
+          "ports": {
+            "input": ["select", "groupUpdate"],
+            "output": ["selectChange", "selected"],
+            "inout": ["radioState"]
+          }
+        }
+      }
+    },
+    "InformationDisplay": {
+      "description": "Отображение информации",
+      "subclasses": {
+        "TextLabel": {
+          "description": "Статический текст (заголовки, подписи)",
+          "color": "#3498db",
+          "properties": {
+            "text": {"type": "string", "required": true, "description": "Отображаемый текст"},
+            "fontSize": {"type": "string", "default": "14px", "description": "Размер шрифта"},
+            "color": {"type": "string", "default": "#000000", "description": "Цвет текста"},
+            "alignment": {"type": "enum", "values": ["left", "center", "right", "justify"], "default": "left"}
+          },
+          "ports": {
+            "input": ["updateText", "style"],
+            "output": ["rendered"],
+            "inout": ["textContent"]
+          }
+        },
+        "Image": {
+          "description": "Отображение статических изображений",
+          "color": "#e74c3c",
+          "properties": {
+            "imageUrl": {"type": "string", "required": true, "description": "URL изображения"},
+            "altText": {"type": "string", "description": "Альтернативный текст"},
+            "width": {"type": "string", "default": "auto", "description": "Ширина изображения"},
+            "height": {"type": "string", "default": "auto", "description": "Высота изображения"}
+          },
+          "ports": {
+            "input": ["srcUpdate", "size"],
+            "output": ["loaded", "error"],
+            "inout": ["imageData"]
+          }
+        },
+        "Icon": {
+          "description": "Векторная иконка (например, из набора Material Icons)",
+          "color": "#2ecc71",
+          "properties": {
+            "iconName": {"type": "string", "required": true, "description": "Имя иконки (например, 'home', 'settings')"},
+            "size": {"type": "string", "default": "24px", "description": "Размер иконки"},
+            "color": {"type": "string", "default": "currentColor", "description": "Цвет иконки"}
+          },
+          "ports": {
+            "input": ["changeIcon", "style"],
+            "output": ["iconRendered"],
+            "inout": ["iconState"]
+          }
+        },
+        "ProgressBar": {
+          "description": "Индикатор выполнения (линейный или круговой)",
+          "color": "#f39c12",
+          "properties": {
+            "value": {"type": "number", "min": 0, "max": 100, "default": 0, "description": "Текущее значение (0-100)"},
+            "max": {"type": "number", "default": 100, "description": "Максимальное значение"},
+            "variant": {"type": "enum", "values": ["linear", "circular"], "default": "linear"},
+            "showLabel": {"type": "boolean", "default": true}
+          },
+          "ports": {
+            "input": ["setValue", "config"],
+            "output": ["progressChange", "complete"],
+            "inout": ["progressState"]
+          }
+        },
+        "Spinner": {
+          "description": "Анимированный индикатор загрузки",
+          "color": "#9b59b6",
+          "properties": {
+            "isActive": {"type": "boolean", "default": true},
+            "size": {"type": "string", "default": "40px", "description": "Размер спиннера"},
+            "speed": {"type": "string", "default": "1s", "description": "Скорость анимации"},
+            "color": {"type": "string", "default": "#3498db", "description": "Цвет спиннера"}
+          },
+          "ports": {
+            "input": ["start", "stop", "config"],
+            "output": ["active", "inactive"],
+            "inout": ["spinnerState"]
+          }
+        },
+        "Tooltip": {
+          "description": "Всплывающая подсказка при наведении",
+          "color": "#1abc9c",
+          "properties": {
+            "content": {"type": "string", "required": true, "description": "Текст подсказки"},
+            "position": {"type": "enum", "values": ["top", "bottom", "left", "right"], "default": "top"},
+            "delay": {"type": "integer", "min": 0, "default": 300, "description": "Задержка показа (мс)"}
+          },
+          "ports": {
+            "input": ["show", "hide", "contentUpdate"],
+            "output": ["shown", "hidden"],
+            "inout": ["tooltipState"]
+          }
+        }
+      }
+    },
+    "NavigationAndMenu": {
+      "description": "Навигация и меню",
+      "subclasses": {
+        "NavBar": {
+          "description": "Панель навигации (вкладки/кнопки перехода)",
+          "color": "#3498db",
+          "properties": {
+            "items": {"type": "array", "items": {"type": "object"}, "required": true, "description": "Элементы навигации"},
+            "activeItem": {"type": "string", "description": "Активный элемент"},
+            "orientation": {"type": "enum", "values": ["horizontal", "vertical"], "default": "horizontal"}
+          },
+          "ports": {
+            "input": ["selectItem", "updateItems"],
+            "output": ["itemSelected", "navChange"],
+            "inout": ["navState"]
+          }
+        },
+        "SideMenu": {
+          "description": "Боковое меню (выезжающее или статичное)",
+          "color": "#e74c3c",
+          "properties": {
+            "items": {"type": "array", "items": {"type": "object"}, "required": true, "description": "Элементы меню"},
+            "isOpen": {"type": "boolean", "default": false},
+            "position": {"type": "enum", "values": ["left", "right"], "default": "left"},
+            "width": {"type": "string", "default": "250px", "description": "Ширина меню"}
+          },
+          "ports": {
+            "input": ["toggle", "selectItem"],
+            "output": ["itemSelected", "open", "close"],
+            "inout": ["menuState"]
+          }
+        },
+        "Breadcrumbs": {
+          "description": "Цепочка переходов («Главная > Раздел > Страница»)",
+          "color": "#2ecc71",
+          "properties": {
+            "items": {"type": "array", "items": {"type": "object"}, "required": true, "description": "Элементы цепочки"},
+            "separator": {"type": "string", "default": ">", "description": "Разделитель"},
+            "maxItems": {"type": "integer", "min": 1, "description": "Максимальное количество видимых элементов"}
+          },
+          "ports": {
+            "input": ["updatePath", "select"],
+            "output": ["crumbSelected", "pathChange"],
+            "inout": ["breadcrumbState"]
+          }
+        },
+        "Pagination": {
+          "description": "Нумерация страниц (для списков/таблиц)",
+          "color": "#f39c12",
+          "properties": {
+            "currentPage": {"type": "integer", "min": 1, "default": 1},
+            "totalPages": {"type": "integer", "min": 1, "required": true},
+            "pageSize": {"type": "integer", "min": 1, "default": 10}
+          },
+          "ports": {
+            "input": ["goToPage", "updateTotal"],
+            "output": ["pageChange", "prev", "next"],
+            "inout": ["paginationState"]
+          }
+        }
+      }
+    },
+    "ListsAndTables": {
+      "description": "Списки и таблицы",
+      "subclasses": {
+        "ListView": {
+          "description": "Вертикальный список элементов (с прокруткой)",
+          "color": "#3498db",
+          "properties": {
+            "items": {"type": "array", "items": {"type": "any"}, "description": "Элементы списка"},
+            "itemTemplate": {"type": "string", "ref": true, "description": "Шаблон элемента"},
+            "itemHeight": {"type": "string", "default": "auto", "description": "Высота элемента"}
+          },
+          "ports": {
+            "input": ["updateItems", "scrollTo"],
+            "output": ["itemSelect", "scroll", "render"],
+            "inout": ["listData"]
+          }
+        },
+        "GridView": {
+          "description": "Сетка элементов (например, фотогалерея)",
+          "color": "#e74c3c",
+          "properties": {
+            "items": {"type": "array", "items": {"type": "any"}, "description": "Элементы сетки"},
+            "columns": {"type": "integer", "min": 1, "default": 3},
+            "itemTemplate": {"type": "string", "ref": true, "description": "Шаблон элемента"}
+          },
+          "ports": {
+            "input": ["updateItems", "gridConfig"],
+            "output": ["itemSelect", "gridRender"],
+            "inout": ["gridData"]
+          }
+        },
+        "TreeView": {
+          "description": "Иерархический список (дерево с ветвями)",
+          "color": "#2ecc71",
+          "properties": {
+            "data": {"type": "array", "items": {"type": "object"}, "description": "Данные дерева"},
+            "expandedNodes": {"type": "array", "items": {"type": "string"}, "description": "Раскрытые узлы"},
+            "showIcons": {"type": "boolean", "default": true}
+          },
+          "ports": {
+            "input": ["updateTree", "expand", "collapse"],
+            "output": ["nodeSelect", "nodeExpand", "nodeCollapse"],
+            "inout": ["treeState"]
+          }
+        },
+        "DataTable": {
+          "description": "Таблица с данными (сортировка, фильтрация)",
+          "color": "#f39c12",
+          "properties": {
+            "columns": {"type": "array", "items": {"type": "object"}, "required": true, "description": "Колонки таблицы"},
+            "data": {"type": "array", "items": {"type": "object"}, "description": "Данные таблицы"},
+            "sortable": {"type": "boolean", "default": true},
+            "filterable": {"type": "boolean", "default": true}
+          },
+          "ports": {
+            "input": ["updateData", "sortBy", "filter"],
+            "output": ["rowSelect", "sortChange", "filterChange"],
+            "inout": ["tableData"]
+          }
+        }
+      }
+    },
+    "InteractiveComponents": {
+      "description": "Интерактивные компоненты",
+      "subclasses": {
+        "Slider": {
+          "description": "Ползунок для выбора значения в диапазоне",
+          "color": "#3498db",
+          "properties": {
+            "min": {"type": "number", "default": 0},
+            "max": {"type": "number", "default": 100},
+            "value": {"type": "number", "default": 50},
+            "step": {"type": "number", "default": 1}
+          },
+          "ports": {
+            "input": ["setValue", "config"],
+            "output": ["change", "slide"],
+            "inout": ["sliderValue"]
+          }
+        },
+        "RangeSlider": {
+          "description": "Двойной ползунок (выбор интервала)",
+          "color": "#e74c3c",
+          "properties": {
+            "min": {"type": "number", "default": 0},
+            "max": {"type": "number", "default": 100},
+            "startValue": {"type": "number", "default": 25},
+            "endValue": {"type": "number", "default": 75}
+          },
+          "ports": {
+            "input": ["setRange", "config"],
+            "output": ["rangeChange", "startChange", "endChange"],
+            "inout": ["rangeValues"]
+          }
+        },
+        "Rating": {
+          "description": "Оценка звёздами (1–5)",
+          "color": "#2ecc71",
+          "properties": {
+            "value": {"type": "integer", "min": 0, "max": 5, "default": 0},
+            "max": {"type": "integer", "min": 1, "default": 5},
+            "readOnly": {"type": "boolean", "default": false}
+          },
+          "ports": {
+            "input": ["setRating", "config"],
+            "output": ["ratingChange", "hover"],
+            "inout": ["ratingState"]
+          }
+        },
+        "Carousel": {
+          "description": "Слайдер для переключения изображений/блоков",
+          "color": "#f39c12",
+          "properties": {
+            "items": {"type": "array", "items": {"type": "object"}, "required": true, "description": "Элементы карусели"},
+            "currentIndex": {"type": "integer", "min": 0, "default": 0},
+            "autoPlay": {"type": "boolean", "default": false},
+            "interval": {"type": "integer", "min": 1000, "default": 3000, "description": "Интервал автопрокрутки (мс)"}
+          },
+          "ports": {
+            "input": ["next", "prev", "goTo"],
+            "output": ["slideChange", "autoPlayStart", "autoPlayStop"],
+            "inout": ["carouselState"]
+          }
+        },
+        "Draggable": {
+          "description": "Элемент, доступный для перетаскивания",
+          "color": "#9b59b6",
+          "properties": {
+            "isDraggable": {"type": "boolean", "default": true},
+            "dragData": {"type": "object", "description": "Данные для перетаскивания"},
+            "dragConstraints": {"type": "object", "description": "Ограничения перетаскивания"}
+          },
+          "ports": {
+            "input": ["startDrag", "endDrag"],
+            "output": ["dragStart", "dragEnd", "dragMove"],
+            "inout": ["dragState"]
+          }
+        }
+      }
+    },
+    "MediaElements": {
+      "description": "Медиа-элементы",
+      "subclasses": {
+        "VideoPlayer": {
+          "description": "Плеер для видео (управление, субтитры)",
+          "color": "#3498db",
+          "properties": {
+            "src": {"type": "string", "required": true, "description": "URL видео"},
+            "controls": {"type": "boolean", "default": true},
+            "autoplay": {"type": "boolean", "default": false},
+            "loop": {"type": "boolean", "default": false}
+          },
+          "ports": {
+            "input": ["play", "pause", "seek"],
+            "output": ["timeUpdate", "ended", "error"],
+            "inout": ["playerState"]
+          }
+        },
+        "AudioPlayer": {
+          "description": "Аудиоплеер (прогресс-бар, паузы)",
+          "color": "#e74c3c",
+          "properties": {
+            "src": {"type": "string", "required": true, "description": "URL аудио"},
+            "controls": {"type": "boolean", "default": true},
+            "autoplay": {"type": "boolean", "default": false},
+            "volume": {"type": "number", "min": 0, "max": 1, "default": 1}
+          },
+          "ports": {
+            "input": ["play", "pause", "volumeSet"],
+            "output": ["timeUpdate", "ended", "volumeChange"],
+            "inout": ["playerState"]
+          }
+        },
+        "MapView": {
+          "description": "Интерактивная карта (масштабирование, маркеры)",
+          "color": "#2ecc71",
+          "properties": {
+            "center": {"type": "object", "required": true, "description": "Центр карты {lat, lng}"},
+            "zoom": {"type": "integer", "min": 1, "max": 20, "default": 10},
+            "markers": {"type": "array", "items": {"type": "object"}, "description": "Маркеры на карте"}
+          },
+          "ports": {
+            "input": ["setCenter", "setZoom", "addMarker"],
+            "output": ["click", "zoomChange", "markerClick"],
+            "inout": ["mapState"]
+          }
+        },
+        "Canvas": {
+          "description": "Область для рисования/графики",
+          "color": "#f39c12",
+          "properties": {
+            "width": {"type": "integer", "required": true, "description": "Ширина канваса"},
+            "height": {"type": "integer", "required": true, "description": "Высота канваса"},
+            "contextType": {"type": "enum", "values": ["2d", "webgl", "webgl2"], "default": "2d"}
+          },
+          "ports": {
+            "input": ["drawCommands", "clear"],
+            "output": ["render", "contextReady"],
+            "inout": ["canvasState"]
+          }
+        }
+      }
+    },
+    "DataVisualization": {
+      "description": "Визуализация данных",
+      "subclasses": {
+        "Chart": {
+          "description": "График (линейный, столбчатый, круговой)",
+          "color": "#3498db",
+          "properties": {
+            "type": {"type": "enum", "values": ["line", "bar", "pie", "scatter", "area"], "default": "line"},
+            "data": {"type": "array", "items": {"type": "object"}, "required": true, "description": "Данные для графика"},
+            "options": {"type": "object", "description": "Опции графика"}
+          },
+          "ports": {
+            "input": ["updateData", "changeType"],
+            "output": ["render", "dataPointClick"],
+            "inout": ["chartData"]
+          }
+        },
+        "Gauge": {
+          "description": "Индикатор-шкала (например, уровень заряда)",
+          "color": "#e74c3c",
+          "properties": {
+            "value": {"type": "number", "default": 50},
+            "min": {"type": "number", "default": 0},
+            "max": {"type": "number", "default": 100},
+            "units": {"type": "string", "description": "Единицы измерения"}
+          },
+          "ports": {
+            "input": ["setValue", "config"],
+            "output": ["valueChange", "thresholdReached"],
+            "inout": ["gaugeState"]
+          }
+        },
+        "ProgressRing": {
+          "description": "Круговой индикатор выполнения",
+          "color": "#2ecc71",
+          "properties": {
+            "value": {"type": "number", "min": 0, "max": 100, "default": 0},
+            "size": {"type": "string", "default": "100px", "description": "Размер кольца"},
+            "thickness": {"type": "string", "default": "10px", "description": "Толщина кольца"}
+          },
+          "ports": {
+            "input": ["setValue", "config"],
+            "output": ["valueChange", "complete"],
+            "inout": ["ringState"]
+          }
+        },
+        "Heatmap": {
+          "description": "Тепловая карта (цветовая градация данных)",
+          "color": "#f39c12",
+          "properties": {
+            "data": {"type": "array", "items": {"type": "array"}, "required": true, "description": "Двумерный массив данных"},
+            "colorScale": {"type": "string", "default": "viridis", "description": "Цветовая шкала"},
+            "cellSize": {"type": "integer", "default": 20, "description": "Размер ячейки"}
+          },
+          "ports": {
+            "input": ["updateData", "config"],
+            "output": ["render", "cellHover"],
+            "inout": ["heatmapData"]
+          }
+        }
+      }
+    },
+    "DialogWindowsAndNotifications": {
+      "description": "Диалоговые окна и уведомления",
+      "subclasses": {
+        "ModalDialog": {
+          "description": "Модальное окно (требует действия пользователя)",
+          "color": "#3498db",
+          "properties": {
+            "isOpen": {"type": "boolean", "default": false},
+            "title": {"type": "string", "description": "Заголовок модального окна"},
+            "content": {"type": "string", "ref": true, "description": "Содержимое модального окна"},
+            "showCloseButton": {"type": "boolean", "default": true}
+          },
+          "ports": {
+            "input": ["open", "close", "updateContent"],
+            "output": ["opened", "closed", "action"],
+            "inout": ["modalState"]
+          }
+        },
+        "Toast": {
+          "description": "Кратковременное уведомление (снизу экрана)",
+          "color": "#e74c3c",
+          "properties": {
+            "message": {"type": "string", "required": true, "description": "Текст уведомления"},
+            "duration": {"type": "integer", "min": 1000, "default": 3000, "description": "Длительность показа (мс)"},
+            "position": {"type": "enum", "values": ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"], "default": "bottom-right"}
+          },
+          "ports": {
+            "input": ["show", "hide"],
+            "output": ["shown", "hidden"],
+            "inout": ["toastState"]
+          }
+        },
+        "Alert": {
+          "description": "Окно предупреждения с кнопками («ОК», «Отмена»)",
+          "color": "#2ecc71",
+          "properties": {
+            "message": {"type": "string", "required": true, "description": "Текст предупреждения"},
+            "type": {"type": "enum", "values": ["info", "warning", "error", "success"], "default": "info"},
+            "buttons": {"type": "array", "items": {"type": "object"}, "default": [{"text": "OK", "action": "ok"}]}
+          },
+          "ports": {
+            "input": ["show", "hide"],
+            "output": ["buttonClick", "shown", "hidden"],
+            "inout": ["alertState"]
+          }
+        },
+        "Snackbar": {
+          "description": "Уведомление с действием (например, «Отменить»)",
+          "color": "#f39c12",
+          "properties": {
+            "message": {"type": "string", "required": true, "description": "Текст уведомления"},
+            "actionText": {"type": "string", "description": "Текст кнопки действия"},
+            "duration": {"type": "integer", "min": 1000, "default": 4000, "description": "Длительность показа (мс)"}
+          },
+          "ports": {
+            "input": ["show", "hide", "action"],
+            "output": ["shown", "hidden", "actionTriggered"],
+            "inout": ["snackbarState"]
+          }
+        }
+      }
+    },
+    "SpecialElements": {
+      "description": "Специальные элементы",
+      "subclasses": {
+        "Separator": {
+          "description": "Разделительная линия между секциями",
+          "color": "#3498db",
+          "properties": {
+            "orientation": {"type": "enum", "values": ["horizontal", "vertical"], "default": "horizontal"},
+            "thickness": {"type": "string", "default": "1px", "description": "Толщина линии"},
+            "color": {"type": "string", "default": "#e0e0e0", "description": "Цвет линии"}
+          },
+          "ports": {
+            "input": ["style"],
+            "output": ["rendered"],
+            "inout": ["separatorState"]
+          }
+        },
+        "Placeholder": {
+          "description": "Заглушка для загрузки контента",
+          "color": "#e74c3c",
+          "properties": {
+            "width": {"type": "string", "default": "100%", "description": "Ширина заглушки"},
+            "height": {"type": "string", "default": "100px", "description": "Высота заглушки"},
+            "animation": {"type": "boolean", "default": true, "description": "Анимация загрузки"}
+          },
+          "ports": {
+            "input": ["show", "hide"],
+            "output": ["shown", "hidden"],
+            "inout": ["placeholderState"]
+          }
+        },
+        "Badge": {
+          "description": "Метка-значок (например, количество уведомлений)",
+          "color": "#2ecc71",
+          "properties": {
+            "count": {"type": "integer", "min": 0, "default": 0},
+            "maxCount": {"type": "integer", "min": 0, "description": "Максимальное отображаемое число"},
+            "color": {"type": "string", "default": "#e74c3c", "description": "Цвет бейджа"},
+            "position": {"type": "enum", "values": ["top-right", "top-left", "bottom-right", "bottom-left"], "default": "top-right"}
+          },
+          "ports": {
+            "input": ["updateCount", "config"],
+            "output": ["countChange"],
+            "inout": ["badgeState"]
+          }
+        },
+        "Tag": {
+          "description": "Тег/метка для категоризации (с крестиком удаления)",
+          "color": "#f39c12",
+          "properties": {
+            "text": {"type": "string", "required": true, "description": "Текст тега"},
+            "color": {"type": "string", "description": "Цвет тега"},
+            "closable": {"type": "boolean", "default": true}
+          },
+          "ports": {
+            "input": ["updateText", "close"],
+            "output": ["closed", "click"],
+            "inout": ["tagState"]
+          }
+        },
+        "Avatar": {
+          "description": "Аватар пользователя (изображение + инициалы)",
+          "color": "#9b59b6",
+          "properties": {
+            "imageUrl": {"type": "string", "description": "URL изображения аватара"},
+            "altText": {"type": "string", "description": "Альтернативный текст"},
+            "size": {"type": "string", "default": "40px", "description": "Размер аватара"},
+            "initials": {"type": "string", "description": "Инициалы (если нет изображения)"}
+          },
+          "ports": {
+            "input": ["updateImage", "config"],
+            "output": ["click", "imageLoaded"],
+            "inout": ["avatarState"]
+          }
+        }
+      }
+    },
+    "FormElements": {
+      "description": "Элементы для форм",
+      "subclasses": {
+        "FormField": {
+          "description": "Обёртка для поля ввода + подписи + валидации",
+          "color": "#3498db",
+          "properties": {
+            "label": {"type": "string", "description": "Метка поля"},
+            "required": {"type": "boolean", "default": false},
+            "errorMessage": {"type": "string", "description": "Сообщение об ошибке"},
+            "helperText": {"type": "string", "description": "Вспомогательный текст"}
+          },
+          "ports": {
+            "input": ["value", "validation"],
+            "output": ["change", "valid", "invalid"],
+            "inout": ["fieldState"]
+          }
+        },
+        "ValidationMessage": {
+          "description": "Сообщение об ошибке ввода",
+          "color": "#e74c3c",
+          "properties": {
+            "message": {"type": "string", "description": "Текст сообщения об ошибке"},
+            "type": {"type": "enum", "values": ["error", "warning", "info"], "default": "error"},
+            "isVisible": {"type": "boolean", "default": false}
+          },
+          "ports": {
+            "input": ["show", "hide", "updateMessage"],
+            "output": ["shown", "hidden"],
+            "inout": ["validationState"]
+          }
+        },
+        "HintText": {
+          "description": "Подсказывающий текст внутри поля",
+          "color": "#2ecc71",
+          "properties": {
+            "text": {"type": "string", "required": true, "description": "Текст подсказки"},
+            "position": {"type": "enum", "values": ["inside", "below", "floating"], "default": "inside"}
+          },
+          "ports": {
+            "input": ["show", "hide"],
+            "output": ["shown", "hidden"],
+            "inout": ["hintState"]
+          }
+        },
+        "CharacterCounter": {
+          "description": "Счётчик символов в поле ввода",
+          "color": "#f39c12",
+          "properties": {
+            "current": {"type": "integer", "min": 0, "default": 0},
+            "max": {"type": "integer", "min": 1, "description": "Максимальное количество символов"},
+            "showPercentage": {"type": "boolean", "default": false}
+          },
+          "ports": {
+            "input": ["updateCount", "config"],
+            "output": ["limitReached", "countChange"],
+            "inout": ["counterState"]
+          }
+        }
+      }
+    }
+  }
+}

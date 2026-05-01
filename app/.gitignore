@@ -1,0 +1,24 @@
+# Android
+*.apk
+*.aab
+*.dex
+*.class
+bin/
+gen/
+build/
+.gradle/
+local.properties
+
+# IDE
+.idea/
+*.iml
+!gradle/wrapper/gradle-wrapper.jar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (если остались файлы)
+__pycache__/
+*.py[cod]
+.venv/
