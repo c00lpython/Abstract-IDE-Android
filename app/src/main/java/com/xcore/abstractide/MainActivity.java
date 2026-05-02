@@ -25,6 +25,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvProperties;
     private ProjectExplorerFragment explorerFragment;
     private BlockPaletteFragment paletteFragment;
+    private float terminalFontSize = 10f;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,7 +43,18 @@ public class MainActivity extends AppCompatActivity {
 
         findViewById(R.id.btnBuild).setOnClickListener(v -> { CodeBuilder b = new CodeBuilder(); tvTerminal.setText("=== Build ===\n" + b.build(currentProject)); });
         findViewById(R.id.btnRun).setOnClickListener(v -> { CodeBuilder b = new CodeBuilder(); tvTerminal.setText("=== Run ===\n" + b.build(currentProject)); });
+
+        // Font scaling
+        findViewById(R.id.btnFontPlus).setOnClickListener(v -> {
+            terminalFontSize += 2f;
+            tvTerminal.setTextSize(terminalFontSize);
+        });
+        findViewById(R.id.btnFontMinus).setOnClickListener(v -> {
+            terminalFontSize = Math.max(6f, terminalFontSize - 2f);
+            tvTerminal.setTextSize(terminalFontSize);
+        });
         findViewById(R.id.btnFullscreen).setOnClickListener(v -> tvTerminal.setTextSize(16));
+
         findViewById(R.id.btnEditProperties).setOnClickListener(v -> {
             for (BlockModel blk : currentProject.getAllBlocks()) {
                 BlockCanvasView.DrawableBlock db = canvasView.getDrawableBlock(blk.getId());
@@ -78,16 +90,17 @@ public class MainActivity extends AppCompatActivity {
                 blk.setColor(def.color != null ? def.color : "#3498db");
                 float[] c = canvasView.getViewCenter();
                 blk.getPosition().put("x", (double)c[0]); blk.getPosition().put("y", (double)c[1]);
-
-                // Установить контейнер если тип в списке
                 if (BlockCanvasView.isContainerType(blk.getType())) {
                     blk.getProperties().put("_is_container", true);
                     blk.getProperties().put("_container_config", def.containerConfig != null ? def.containerConfig : new java.util.HashMap<>());
                     blk.getProperties().put("_container_items", new java.util.ArrayList<>());
                     blk.initTransients();
                 }
-
                 currentProject.addBlock(blk); canvasView.addBlock(blk);
+                if ("If".equals(def.subclassName) || "ControlFlow.If".equals(def.fullName)) {
+                    BlockCanvasView.DrawableBlock ifBlock = canvasView.getDrawableBlock(blk.getId());
+                    if (ifBlock != null) canvasView.createBranchBlocks(ifBlock);
+                }
                 paletteFragment.autoAddToCreated(blk);
                 tvTerminal.append("\n+ " + def.subclassName + " container=" + blk.isContainerBlock());
                 explorerFragment.setProject(currentProject);

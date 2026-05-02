@@ -55,6 +55,16 @@ public class ProjectExplorerFragment extends Fragment {
         expandableListView.setAdapter(adapter);
         expandAll();
 
+        // Клик по корневому блоку (группе)
+        expandableListView.setOnGroupClickListener((parent, v, groupPos, id) -> {
+            ExplorerItem item = rootItems.get(groupPos);
+            if (listener != null && item.blockId > 0) {
+                listener.onBlockSelect(item.blockId);
+            }
+            return false; // false = разрешить разворачивать/сворачивать группу
+        });
+
+        // Клик по дочернему блоку
         expandableListView.setOnChildClickListener((parent, v, groupPos, childPos, id) -> {
             ExplorerItem child = rootItems.get(groupPos).children.get(childPos);
             if (listener != null && child.blockId > 0) {
@@ -71,6 +81,9 @@ public class ProjectExplorerFragment extends Fragment {
             if (childPos >= 0) {
                 ExplorerItem item = rootItems.get(groupPos).children.get(childPos);
                 showContextMenu(view, item);
+            } else {
+                ExplorerItem item = rootItems.get(groupPos);
+                if (item.blockId > 0) showContextMenu(view, item);
             }
             return true;
         });

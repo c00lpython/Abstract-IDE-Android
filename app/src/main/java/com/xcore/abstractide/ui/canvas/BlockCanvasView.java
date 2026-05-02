@@ -79,6 +79,7 @@ public class BlockCanvasView extends View {
     private final Paint portPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint connectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint tempLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint inheritancePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint nestPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint swapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -132,11 +133,85 @@ public class BlockCanvasView extends View {
     public void selectBlock(int blockId) { for(DrawableBlock db:blocks.values()) db.selected=(db.id==blockId); invalidate(); }
     public DrawableBlock getDrawableBlock(int blockId) { return blocks.get(blockId); }
     public float[] getViewCenter() { return new float[]{(getWidth()/2f-panX)/scaleFactor,(getHeight()/2f-panY)/scaleFactor}; }
-    public void centerOnBlock(int blockId) { DrawableBlock db=blocks.get(blockId); if(db==null) return; panX=getWidth()/2f-(db.x+getBlockWidth(db)/2)*scaleFactor; panY=getHeight()/2f-(db.y+getBlockHeight(db)/2)*scaleFactor; clampPan(); invalidate(); }
+
+    public void centerOnBlock(int blockId) {
+        invalidate();
+        post(() -> {
+            DrawableBlock db = blocks.get(blockId);
+            if (db == null) return;
+            float cx = db.x + getBlockWidth(db) / 2;
+            float cy = db.y + getBlockHeight(db) / 2;
+            android.util.Log.d("CAMERA", "Center on " + blockId + " at (" + cx + "," + cy + ")");
+            panX = getWidth() / 2f - cx * scaleFactor;
+            panY = getHeight() / 2f - cy * scaleFactor;
+            clampPan();
+            invalidate();
+        });
+    }
+
     private void clampPan() { panX=Math.max(-worldMaxX*scaleFactor+getWidth(),Math.min(-worldMinX*scaleFactor,panX)); panY=Math.max(-worldMaxY*scaleFactor+getHeight(),Math.min(-worldMinY*scaleFactor,panY)); }
 
     public void onConnectionToContainer(int fromBlockId, int toBlockId) { DrawableBlock from=blocks.get(fromBlockId),to=blocks.get(toBlockId); if(from!=null&&to!=null&&to.model.isContainerBlock()) createCallBlock(from,to); }
-    public void createCallBlock(DrawableBlock source, DrawableBlock container) { if(!container.model.isContainerBlock()) return; String cn="call_"+(source.model.getName()!=null?source.model.getName():"block"); int cid=container.id*1000+source.id; if(blocks.containsKey(cid)) return; BlockModel cm=new BlockModel(); cm.setId(cid); cm.setType(new BlockModel.BlockType("code","Calls","Call")); cm.setName(cn); cm.setColor(source.model.getColor()); cm.getPosition().put("x",0.0); cm.getPosition().put("y",0.0); cm.getSize().put("width",90.0); cm.getSize().put("height",24.0); cm.setParentId(container.id); cm.getProperties().put("_is_call_block",true); cm.initTransients(); addBlock(cm); container.model.getChildrenIds().add(cid); container.model.addChild(cid); invalidate(); }
+
+    public void createCallBlock(DrawableBlock source, DrawableBlock container) {
+        if (!container.model.isContainerBlock()) return;
+        String ct = container.model.getContainerType();
+        String cn = "call_" + (source.model.getName() != null ? source.model.getName() : "block");
+        int cid = container.id * 1000 + source.id;
+        if (blocks.containsKey(cid)) return;
+        BlockModel cm = new BlockModel();
+        cm.setId(cid);
+        cm.setType(new BlockModel.BlockType("code", "Calls", "Call"));
+        cm.setName(cn);
+        cm.setColor(source.model.getColor());
+        if ("if".equals(ct) || "ControlFlow.If".equals(container.model.getType().getFullName())) {
+            float condX = container.x + getBlockWidth(container) + 14;
+            float condY = container.y + 12;
+            cm.getPosition().put("x", (double) condX);
+            cm.getPosition().put("y", (double) condY);
+            cm.getSize().put("width", 170.0);
+            cm.getSize().put("height", container.model.getSize().getOrDefault("height", 80.0) - 20.0);
+        } else {
+            cm.getPosition().put("x", 0.0);
+            cm.getPosition().put("y", 0.0);
+            cm.getSize().put("width", 90.0);
+            cm.getSize().put("height", 24.0);
+        }
+        cm.setParentId(container.id);
+        cm.getProperties().put("_is_call_block", true);
+        cm.initTransients();
+        addBlock(cm);
+        container.model.getChildrenIds().add(cid);
+        container.model.addChild(cid);
+        invalidate();
+    }
+
+    public void createBranchBlocks(DrawableBlock ifBlock) {
+        int trueId = ifBlock.id * 1000 + 999;
+        if (!blocks.containsKey(trueId)) {
+            BlockModel tb = new BlockModel();
+            tb.setId(trueId); tb.setType(new BlockModel.BlockType("code","ControlFlow","TrueBranch"));
+            tb.setName("True"); tb.setColor("#2ecc71");
+            tb.getPosition().put("x", ifBlock.x + 30.0); tb.getPosition().put("y", ifBlock.y + getBlockHeight(ifBlock) + 50.0);
+            tb.getSize().put("width", 150.0); tb.getSize().put("height", 80.0);
+            tb.setParentId(ifBlock.id);
+            tb.getProperties().put("_branch_type", "true");
+            tb.initTransients(); addBlock(tb);
+            ifBlock.model.getChildrenIds().add(trueId); ifBlock.model.addChild(trueId);
+        }
+        int falseId = ifBlock.id * 1000 + 998;
+        if (!blocks.containsKey(falseId)) {
+            BlockModel fb = new BlockModel();
+            fb.setId(falseId); fb.setType(new BlockModel.BlockType("code","ControlFlow","FalseBranch"));
+            fb.setName("False"); fb.setColor("#e74c3c");
+            fb.getPosition().put("x", ifBlock.x + 250.0); fb.getPosition().put("y", ifBlock.y + getBlockHeight(ifBlock) + 50.0);
+            fb.getSize().put("width", 150.0); fb.getSize().put("height", 80.0);
+            fb.setParentId(ifBlock.id);
+            fb.getProperties().put("_branch_type", "false");
+            fb.initTransients(); addBlock(fb);
+            ifBlock.model.getChildrenIds().add(falseId); ifBlock.model.addChild(falseId);
+        }
+    }
 
     public void nestBlock(int childId, int parentId) { DrawableBlock child=blocks.get(childId),parent=blocks.get(parentId); if(child==null||parent==null||child==parent) return; if(wouldCreateCycle(child,parent)) return; if(child.model.getParentId()!=null){ DrawableBlock old=blocks.get(child.model.getParentId()); if(old!=null) old.model.getChildrenIds().remove((Integer)childId); } parent.model.getChildrenIds().add(childId); parent.model.addChild(childId); child.model.setParentId(parentId); invalidate(); if(canvasChangeListener!=null) canvasChangeListener.onBlockNested(childId,parentId); }
     private boolean wouldCreateCycle(DrawableBlock child, DrawableBlock parent) { DrawableBlock cur=parent; while(cur!=null){ if(cur==child) return true; if(cur.model.getParentId()==null) break; cur=blocks.get(cur.model.getParentId()); } return false; }
@@ -159,51 +234,88 @@ public class BlockCanvasView extends View {
     private void drawGrid(Canvas canvas) { float l=-panX/scaleFactor-100,t=-panY/scaleFactor-100,r=l+getWidth()/scaleFactor+200,b=t+getHeight()/scaleFactor+200; for(float x=(float)(Math.floor(l/GRID_SIZE)*GRID_SIZE);x<=r;x+=GRID_SIZE)canvas.drawLine(x,t,x,b,gridPaint); for(float y=(float)(Math.floor(t/GRID_SIZE)*GRID_SIZE);y<=b;y+=GRID_SIZE)canvas.drawLine(l,y,r,y,gridPaint); }
 
     private void drawBlock(Canvas canvas, DrawableBlock db) {
-        float w=getBlockWidth(db),h=getBlockHeight(db); RectF rect=new RectF(db.x,db.y,db.x+w,db.y+h); int color=parseColor(db.model.getColor());
-        blockPaint.setColor(0x40000000); blockPaint.setStyle(Paint.Style.FILL); canvas.drawRoundRect(new RectF(rect.left+2,rect.top+2,rect.right+2,rect.bottom+2),BLOCK_RADIUS,BLOCK_RADIUS,blockPaint);
-        blockPaint.setColor(darken(color)); canvas.drawRoundRect(rect,BLOCK_RADIUS,BLOCK_RADIUS,blockPaint);
-        RectF hdr=new RectF(db.x,db.y,db.x+w,db.y+HEADER_HEIGHT); blockPaint.setColor(color); canvas.drawRoundRect(hdr,BLOCK_RADIUS,BLOCK_RADIUS,blockPaint);
-        canvas.drawRect(new RectF(db.x+BLOCK_RADIUS,db.y+HEADER_HEIGHT-BLOCK_RADIUS,db.x+w-BLOCK_RADIUS,db.y+HEADER_HEIGHT),blockPaint);
-        String prefix=db.model.isCallBlock()?"⚡":"";
-        String name=db.model.getName(); if(name!=null)canvas.drawText(prefix+name,db.x+10,db.y+HEADER_HEIGHT-6,textPaint);
-        String type=db.model.getType()!=null?db.model.getType().getSubclassName():""; if(!type.isEmpty())canvas.drawText(type,db.x+10,db.y+HEADER_HEIGHT+16,smallTextPaint);
-        portPaint.setColor(PORT_INPUT_COLOR); canvas.drawCircle(db.x,db.y+h/2,PORT_RADIUS,portPaint);
-        portPaint.setColor(PORT_OUTPUT_COLOR); canvas.drawCircle(db.x+w,db.y+h/2,PORT_RADIUS,portPaint);
+        String name = db.model.getName();
+        String prefix = db.model.isCallBlock() ? "⚡" : "";
+        if (name != null && !name.isEmpty()) {
+            float textW = textPaint.measureText(prefix + name) + 30;
+            float currentW = db.model.getSize().getOrDefault("width", 150.0).floatValue();
+            if (textW > currentW) db.model.getSize().put("width", (double) textW);
+        }
+        float w = getBlockWidth(db), h = getBlockHeight(db);
+        RectF rect = new RectF(db.x, db.y, db.x + w, db.y + h);
+        int color = parseColor(db.model.getColor());
 
-        if(db.model.isContainerBlock()){
+        blockPaint.setColor(0x40000000); blockPaint.setStyle(Paint.Style.FILL);
+        canvas.drawRoundRect(new RectF(rect.left+2, rect.top+2, rect.right+2, rect.bottom+2), BLOCK_RADIUS, BLOCK_RADIUS, blockPaint);
+        blockPaint.setColor(darken(color));
+        canvas.drawRoundRect(rect, BLOCK_RADIUS, BLOCK_RADIUS, blockPaint);
+        RectF hdr = new RectF(db.x, db.y, db.x + w, db.y + HEADER_HEIGHT);
+        blockPaint.setColor(color);
+        canvas.drawRoundRect(hdr, BLOCK_RADIUS, BLOCK_RADIUS, blockPaint);
+        canvas.drawRect(new RectF(db.x+BLOCK_RADIUS, db.y+HEADER_HEIGHT-BLOCK_RADIUS, db.x+w-BLOCK_RADIUS, db.y+HEADER_HEIGHT), blockPaint);
+        if (name != null) canvas.drawText(prefix + name, db.x + 10, db.y + HEADER_HEIGHT - 6, textPaint);
+        String type = db.model.getType() != null ? db.model.getType().getSubclassName() : "";
+        if (!type.isEmpty()) canvas.drawText(type, db.x + 10, db.y + HEADER_HEIGHT + 16, smallTextPaint);
+        String branchType = String.valueOf(db.model.getProperties().getOrDefault("_branch_type", ""));
+        if (!"true".equals(branchType) && !"false".equals(branchType)) {
+            portPaint.setColor(PORT_INPUT_COLOR); canvas.drawCircle(db.x, db.y + h/2, PORT_RADIUS, portPaint);
+            portPaint.setColor(PORT_OUTPUT_COLOR); canvas.drawCircle(db.x + w, db.y + h/2, PORT_RADIUS, portPaint);
+        }
+
+        if (db.model.isContainerBlock()) {
             blockPaint.setColor(Color.WHITE); blockPaint.setStyle(Paint.Style.STROKE); blockPaint.setStrokeWidth(2f);
-            blockPaint.setPathEffect(new DashPathEffect(new float[]{8,4},0)); canvas.drawRoundRect(rect,BLOCK_RADIUS,BLOCK_RADIUS,blockPaint); blockPaint.setPathEffect(null);
-            String ct=db.model.getContainerType(); int cc=db.model.getChildrenIds().size();
+            blockPaint.setPathEffect(new DashPathEffect(new float[]{8, 4}, 0)); canvas.drawRoundRect(rect, BLOCK_RADIUS, BLOCK_RADIUS, blockPaint); blockPaint.setPathEffect(null);
+            String ct = db.model.getContainerType(); int cc = db.model.getChildrenIds().size();
 
-            if("dictionary".equals(ct)){
+            if ("dictionary".equals(ct)) {
                 float cellH=24,cellPadding=8; float startX=db.x+w+10; float startY=db.y+8; int pairCount=Math.max(1,(cc+1)/2);
                 float maxKeyW=60,maxValW=60;
                 for(int i=0;i<cc;i++){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(i));
                     if(child!=null){ String cn=child.model.getName(); float tw=textPaint.measureText(cn!=null?cn:"?"); float bw=tw+30;
                         if(i%2==0)maxKeyW=Math.max(maxKeyW,bw); else maxValW=Math.max(maxValW,bw); } }
-                float cellW=Math.max(maxKeyW,maxValW)+cellPadding*2;
+                final float cellW=Math.max(maxKeyW,maxValW)+cellPadding*2;
                 for(int i=0;i<pairCount;i++){ float cellX=startX+i*(cellW+6);
                     RectF cell=new RectF(cellX,startY,cellX+cellW,startY+cellH); cellPaint.setColor(0x00000000);cellPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,6,6,cellPaint);
                     cellPaint.setColor(0xFFe67e22);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(cell,6,6,cellPaint);
                     smallTextPaint.setColor(0xFFe67e22);canvas.drawText("Key",cellX+6,startY+cellH/2+4,smallTextPaint);
                     int keyIdx=i*2; if(keyIdx<cc){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(keyIdx));
-                        if(child!=null){ child.x=cellX+cellPadding;child.y=startY+cellH+2;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);drawBlock(canvas,child); } } }
+                        if(child!=null){ child.model.getSize().put("width",(double)(cellW-cellPadding*2));child.model.getSize().put("height",(double)(cellH-4.0));child.x=cellX+cellPadding;child.y=startY+cellH+2;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);drawBlock(canvas,child); } } }
                 float valueY=startY+cellH+8;
                 for(int i=0;i<pairCount;i++){ float cellX=startX+i*(cellW+6);
                     RectF cell=new RectF(cellX,valueY,cellX+cellW,valueY+cellH); cellPaint.setColor(0x00000000);cellPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,6,6,cellPaint);
                     cellPaint.setColor(0xFF27ae60);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(cell,6,6,cellPaint);
                     smallTextPaint.setColor(0xFF27ae60);canvas.drawText("Value",cellX+4,valueY+cellH/2+4,smallTextPaint);
                     int valIdx=i*2+1; if(valIdx<cc){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(valIdx));
-                        if(child!=null){ child.x=cellX+cellPadding;child.y=valueY+cellH+2;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);drawBlock(canvas,child); } } }
-            } else if("list".equals(ct)||"array".equals(ct)){
+                        if(child!=null){ child.model.getSize().put("width",(double)(cellW-cellPadding*2));child.model.getSize().put("height",(double)(cellH-4.0));child.x=cellX+cellPadding;child.y=valueY+cellH+2;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);drawBlock(canvas,child); } } }
+            } else if ("list".equals(ct) || "array".equals(ct)) {
                 float cw=100,ch2=h-16; int tc=Math.max(1,cc+1);
                 for(int i=0;i<tc;i++){ float cx=db.x+w+10+i*(cw+8),cy=db.y+8; RectF cell=new RectF(cx,cy,cx+cw,cy+ch2);
                     if(i<cc){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(i)); if(child!=null){ blockPaint.setColor(0x18000000);blockPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,8,8,blockPaint); child.x=cx+4;child.y=cy+4;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);child.model.getSize().put("width",cw-8.0);child.model.getSize().put("height",ch2-8.0);drawBlock(canvas,child); } }
                     else{ cellPaint.setColor(CELL_COLOR);canvas.drawRoundRect(cell,8,8,cellPaint);cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(cell,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);smallTextPaint.setColor(0xFF666666);canvas.drawText("["+i+"]",cx+30,cy+ch2/2+4,smallTextPaint); } }
-            } else if("function".equals(ct)||"method".equals(ct)){
+            } else if ("if".equals(ct) || "ControlFlow.If".equals(db.model.getType().getFullName())) {
+                float condW=180,condH=h-16;
+                RectF condCell=new RectF(db.x+w+10,db.y+8,db.x+w+10+condW,db.y+8+condH);
+                cellPaint.setColor(0x00000000);canvas.drawRoundRect(condCell,8,8,cellPaint);
+                cellPaint.setColor(0xFFf39c12);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(condCell,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);
+                smallTextPaint.setColor(0xFFf39c12);canvas.drawText("Condition",db.x+w+30,db.y+condH/2+12,smallTextPaint);
+                for(int cid:db.model.getChildrenIds()){ DrawableBlock child=blocks.get(cid);
+                    if(child!=null){ String bt=String.valueOf(child.model.getProperties().getOrDefault("_branch_type",""));
+                        if("true".equals(bt)||"false".equals(bt)){
+                            float ifCX=db.x+w/2,ifBY=db.y+h,brTX=child.x+getBlockWidth(child)/2,brTY=child.y;
+                            inheritancePaint.setColor("true".equals(bt)?0xFF2ecc71:0xFFe74c3c);
+                            inheritancePaint.setAlpha(200);inheritancePaint.setStrokeWidth(3f);
+                            canvas.drawLine(ifCX,ifBY,brTX,brTY,inheritancePaint);
+                        }
+                    }
+                }
+            } else if ("function".equals(ct) || "method".equals(ct)) {
                 float cw=120,ch2=h-16;
-                RectF pc=new RectF(db.x+w+10,db.y+8,db.x+w+10+cw,db.y+8+ch2); cellPaint.setColor(0xFF9b59b6);canvas.drawRoundRect(pc,8,8,cellPaint);cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(pc,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);smallTextPaint.setColor(0xFFffffff);canvas.drawText("Params",db.x+w+30,db.y+ch2/2+8,smallTextPaint);
-                RectF bc=new RectF(db.x+w+10+cw+8,db.y+8,db.x+w+10+cw*2+8,db.y+8+ch2); cellPaint.setColor(0xFF34495e);canvas.drawRoundRect(bc,8,8,cellPaint);cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(bc,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);smallTextPaint.setColor(0xFFffffff);canvas.drawText("Body",db.x+w+cw+30,db.y+ch2/2+8,smallTextPaint);
+                RectF pc=new RectF(db.x+w+10,db.y+8,db.x+w+10+cw,db.y+8+ch2); cellPaint.setColor(0xFF9b59b6);canvas.drawRoundRect(pc,8,8,cellPaint);
+                cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(pc,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);
+                smallTextPaint.setColor(0xFFffffff);canvas.drawText("Params",db.x+w+30,db.y+ch2/2+8,smallTextPaint);
+                RectF bc=new RectF(db.x+w+10+cw+8,db.y+8,db.x+w+10+cw*2+8,db.y+8+ch2); cellPaint.setColor(0xFF34495e);canvas.drawRoundRect(bc,8,8,cellPaint);
+                cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(bc,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);
+                smallTextPaint.setColor(0xFFffffff);canvas.drawText("Body",db.x+w+cw+30,db.y+ch2/2+8,smallTextPaint);
             } else {
                 float cw=100,ch2=h-16; int tc=Math.max(1,cc+1);
                 for(int i=0;i<tc;i++){ float cx=db.x+w+10+i*(cw+8),cy=db.y+8; RectF cell=new RectF(cx,cy,cx+cw,cy+ch2);
@@ -212,12 +324,22 @@ public class BlockCanvasView extends View {
             }
         }
 
-        if(!db.model.getChildrenIds().isEmpty()&&!db.model.isContainerBlock()){ float cy=db.y+h+8,cx=db.x+CHILD_INDENT;int idx=0;for(int cid:db.model.getChildrenIds()){ DrawableBlock child=blocks.get(cid);if(child!=null){float cw=getBlockWidth(child),ch2=getBlockHeight(child);child.x=cx;child.y=cy;child.model.getPosition().put("x",(double)cx);child.model.getPosition().put("y",(double)cy);blockPaint.setColor(idx%2==0?0x18000000:0x10000000);blockPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(new RectF(cx-5,cy-2,cx+cw+40,cy+ch2+2),6,6,blockPaint);smallTextPaint.setColor(0xFF888888);canvas.drawText((idx+1)+".",cx-18,cy+ch2/2+4,smallTextPaint);drawBlock(canvas,child);idx++;cy+=ch2+4;} } }
-        if(!db.model.getChildrenIds().isEmpty()){smallTextPaint.setColor(0xFF888888);canvas.drawText("🏠"+db.model.getChildrenIds().size(),db.x+6,db.y+HEADER_HEIGHT-6,smallTextPaint);}
-        if(!db.model.getChildrenIds().isEmpty()){boolean col=collapsedBlocks.contains(db.id);buttonPaint.setColor(0xFF3a3a3a);canvas.drawCircle(db.x+w-16,db.y+10,8,buttonPaint);smallTextPaint.setColor(0xFFcccccc);canvas.drawText(col?"+":"−",db.x+w-20,db.y+14,smallTextPaint);}
-        if(db.selected)canvas.drawRoundRect(new RectF(rect.left-2,rect.top-2,rect.right+2,rect.bottom+2),BLOCK_RADIUS+2,BLOCK_RADIUS+2,selectionPaint);
-        if(db==nestTarget&&draggingBlock!=null&&db!=swapTarget){nestPaint.setColor(nestingReady?NEST_READY_COLOR:Color.argb((int)(80+175*Math.min(1f,(System.currentTimeMillis()-nestHoverStart)/NEST_HOVER_DELAY)),46,204,113));nestPaint.setPathEffect(new DashPathEffect(new float[]{10,5},0));canvas.drawRoundRect(new RectF(rect.left-8,rect.top-8,rect.right+8,rect.bottom+8),BLOCK_RADIUS+8,BLOCK_RADIUS+8,nestPaint);nestPaint.setPathEffect(null);smallTextPaint.setColor(nestingReady?NEST_READY_COLOR:0xFFaaaaaa);canvas.drawText(nestingReady?"▼ RELEASE TO NEST ▼":"▼ HOLD TO NEST ▼",db.x+w/2-80,db.y-12,smallTextPaint);}
-        if(db==swapTarget&&draggingBlock!=null){swapPaint.setPathEffect(new DashPathEffect(new float[]{6,3},0));canvas.drawRoundRect(new RectF(rect.left-4,rect.top-4,rect.right+4,rect.bottom+4),BLOCK_RADIUS+4,BLOCK_RADIUS+4,swapPaint);swapPaint.setPathEffect(null);smallTextPaint.setColor(SWAP_COLOR);canvas.drawText("⇄ SWAP",db.x+w/2-25,db.y-8,smallTextPaint);}
+        if (!db.model.getChildrenIds().isEmpty() && !db.model.isContainerBlock()) {
+            float cy=db.y+h+8,cx=db.x+CHILD_INDENT;int idx=0;
+            for(int cid:db.model.getChildrenIds()){ DrawableBlock child=blocks.get(cid);if(child!=null){
+                float cw=getBlockWidth(child),ch2=getBlockHeight(child);child.x=cx;child.y=cy;
+                child.model.getPosition().put("x",(double)cx);child.model.getPosition().put("y",(double)cy);
+                blockPaint.setColor(idx%2==0?0x18000000:0x10000000);blockPaint.setStyle(Paint.Style.FILL);
+                canvas.drawRoundRect(new RectF(cx-5,cy-2,cx+cw+40,cy+ch2+2),6,6,blockPaint);
+                smallTextPaint.setColor(0xFF888888);canvas.drawText((idx+1)+".",cx-18,cy+ch2/2+4,smallTextPaint);
+                drawBlock(canvas,child);idx++;cy+=ch2+4;
+            }}
+        }
+        if (!db.model.getChildrenIds().isEmpty()) { smallTextPaint.setColor(0xFF888888);canvas.drawText("🏠"+db.model.getChildrenIds().size(),db.x+6,db.y+HEADER_HEIGHT-6,smallTextPaint); }
+        if (!db.model.getChildrenIds().isEmpty()) { boolean col=collapsedBlocks.contains(db.id);buttonPaint.setColor(0xFF3a3a3a);canvas.drawCircle(db.x+w-16,db.y+10,8,buttonPaint);smallTextPaint.setColor(0xFFcccccc);canvas.drawText(col?"+":"−",db.x+w-20,db.y+14,smallTextPaint); }
+        if (db.selected) canvas.drawRoundRect(new RectF(rect.left-2,rect.top-2,rect.right+2,rect.bottom+2),BLOCK_RADIUS+2,BLOCK_RADIUS+2,selectionPaint);
+        if (db==nestTarget&&draggingBlock!=null&&db!=swapTarget){nestPaint.setColor(nestingReady?NEST_READY_COLOR:Color.argb((int)(80+175*Math.min(1f,(System.currentTimeMillis()-nestHoverStart)/NEST_HOVER_DELAY)),46,204,113));nestPaint.setPathEffect(new DashPathEffect(new float[]{10,5},0));canvas.drawRoundRect(new RectF(rect.left-8,rect.top-8,rect.right+8,rect.bottom+8),BLOCK_RADIUS+8,BLOCK_RADIUS+8,nestPaint);nestPaint.setPathEffect(null);smallTextPaint.setColor(nestingReady?NEST_READY_COLOR:0xFFaaaaaa);canvas.drawText(nestingReady?"▼ RELEASE TO NEST ▼":"▼ HOLD TO NEST ▼",db.x+w/2-80,db.y-12,smallTextPaint);}
+        if (db==swapTarget&&draggingBlock!=null){swapPaint.setPathEffect(new DashPathEffect(new float[]{6,3},0));canvas.drawRoundRect(new RectF(rect.left-4,rect.top-4,rect.right+4,rect.bottom+4),BLOCK_RADIUS+4,BLOCK_RADIUS+4,swapPaint);swapPaint.setPathEffect(null);smallTextPaint.setColor(SWAP_COLOR);canvas.drawText("⇄ SWAP",db.x+w/2-25,db.y-8,smallTextPaint);}
     }
 
     private void drawConnection(Canvas canvas, DrawableBlock from, DrawableBlock to) { float fw=getBlockWidth(from),fh=getBlockHeight(from),tw=getBlockWidth(to),th=getBlockHeight(to); PointF s=new PointF(from.x+fw,from.y+fh/2),e=new PointF(to.x,to.y+th/2); connectionPath.reset();connectionPath.moveTo(s.x,s.y);float dx=e.x-s.x;connectionPath.cubicTo(s.x+dx*0.4f,s.y,e.x-dx*0.4f,e.y,e.x,e.y);canvas.drawPath(connectionPath,connectionPaint); float ang=(float)Math.atan2(e.y-s.y,e.x-s.x),sz=12,sw=6; Path arrow=new Path();arrow.moveTo(e.x,e.y);arrow.lineTo(e.x-sz*(float)Math.cos(ang-0.4f),e.y-sz*(float)Math.sin(ang-0.4f));arrow.lineTo(e.x-sw*(float)Math.cos(ang+Math.PI/2),e.y-sw*(float)Math.sin(ang+Math.PI/2));arrow.lineTo(e.x-sz*(float)Math.cos(ang+0.4f),e.y-sz*(float)Math.sin(ang+0.4f));arrow.close(); connectionPaint.setStyle(Paint.Style.FILL);canvas.drawPath(arrow,connectionPaint);connectionPaint.setStyle(Paint.Style.STROKE); }
@@ -241,7 +363,7 @@ public class BlockCanvasView extends View {
 
     private void resetState(){isDraggingBlock=false;isDraggingConnection=false;isPanning=false;draggingBlock=null;connectionSource=null;dragStartPort=null;tempLineStart=null;tempLineEnd=null;nestTarget=null;swapTarget=null;nestingReady=false;}
     private void checkNesting(DrawableBlock dragged,float wx,float wy){nestTarget=null;swapTarget=null;for(DrawableBlock db:blocks.values()){if(db==dragged)continue;float w=getBlockWidth(db),h=getBlockHeight(db);if(wx>=db.x&&wx<=db.x+w&&wy>=db.y&&wy<=db.y+h){if(dragged.model.getParentId()!=null&&db.model.getParentId()!=null&&dragged.model.getParentId().equals(db.model.getParentId())){swapTarget=db;nestingReady=true;return;}if(!wouldCreateCycle(dragged,db)){nestTarget=db;if(nestHoverStart==0||nestTarget!=db){nestHoverStart=System.currentTimeMillis();nestingReady=false;}else if(System.currentTimeMillis()-nestHoverStart>NEST_HOVER_DELAY)nestingReady=true;return;}}}nestHoverStart=0;nestingReady=false;}
-    private void handleDrop(){if(swapTarget!=null&&draggingBlock!=null){swapChildren(draggingBlock,swapTarget);}else if(nestTarget!=null&&nestingReady&&draggingBlock!=null){nestBlock(draggingBlock.id,nestTarget.id);}nestTarget=null;swapTarget=null;nestingReady=false;}
+    private void handleDrop(){if(swapTarget!=null&&draggingBlock!=null){swapChildren(draggingBlock,swapTarget);}else if(nestTarget!=null&&nestingReady&&draggingBlock!=null){nestBlock(draggingBlock.id,nestTarget.id);}else if(draggingBlock!=null&&draggingBlock.model.getParentId()!=null){invalidate();}nestTarget=null;swapTarget=null;nestingReady=false;}
 
     private DrawableBlock findBlockAt(float x,float y){List<DrawableBlock> rev=new ArrayList<>(blocks.values());Collections.reverse(rev);for(DrawableBlock db:rev){if(x>=db.x&&x<=db.x+getBlockWidth(db)&&y>=db.y&&y<=db.y+getBlockHeight(db))return db;}return null;}
     private PortHit findPortAt(float x,float y){for(DrawableBlock db:blocks.values()){float w=getBlockWidth(db),h=getBlockHeight(db);if(Math.hypot(x-db.x,y-(db.y+h/2))<=PORT_RADIUS*2.5f)return new PortHit(db,"input");if(Math.hypot(x-(db.x+w),y-(db.y+h/2))<=PORT_RADIUS*2.5f)return new PortHit(db,"output");}return null;}
