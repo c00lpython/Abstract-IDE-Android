@@ -69,6 +69,57 @@ public class ProjectModel {
         }
     }
 
+    // ✅ ДОБАВЛЕН МЕТОД removeBlock
+    public void removeBlock(int blockId) {
+        String key = String.valueOf(blockId);
+        BlockModel block = blocks.get(key);
+        if (block != null) {
+            // Удаляем все связи, связанные с этим блоком
+            List<String> toRemove = new ArrayList<>();
+            for (Connection conn : connections.values()) {
+                if (conn.getFromBlockId() == blockId || conn.getToBlockId() == blockId) {
+                    toRemove.add(conn.getId());
+                }
+            }
+            for (String connId : toRemove) {
+                connections.remove(connId);
+            }
+
+            // Удаляем блок из родителя
+            if (block.getParentId() != null) {
+                BlockModel parent = getBlock(block.getParentId());
+                if (parent != null) {
+                    parent.getChildrenIds().remove((Integer) blockId);
+                }
+            }
+
+            // Удаляем всех детей рекурсивно
+            for (int childId : block.getChildrenIds()) {
+                removeBlock(childId);
+            }
+
+            // Удаляем из индекса имен
+            if (nameIndex.containsKey(block.getName())) {
+                nameIndex.get(block.getName()).remove((Integer) blockId);
+                if (nameIndex.get(block.getName()).isEmpty()) {
+                    nameIndex.remove(block.getName());
+                }
+            }
+
+            // Удаляем блок
+            blocks.remove(key);
+            modifiedAt = java.time.LocalDateTime.now().toString();
+        }
+    }
+
+    // ✅ ДОБАВЛЕН МЕТОД removeConnection
+    public void removeConnection(String connectionId) {
+        if (connections.containsKey(connectionId)) {
+            connections.remove(connectionId);
+            modifiedAt = java.time.LocalDateTime.now().toString();
+        }
+    }
+
     public BlockModel getBlock(int blockId) {
         return blocks.get(String.valueOf(blockId));
     }

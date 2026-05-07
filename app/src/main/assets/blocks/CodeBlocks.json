@@ -81,7 +81,7 @@
         }
       }
     },
-    
+
     "DictOperations": {
       "description": "Операции со словарями",
       "color": "#e67e22",
@@ -192,7 +192,7 @@
         }
       }
     },
-    
+
     "Functions": {
       "description": "Функции",
       "color": "#16a085",
@@ -217,14 +217,14 @@
         }
       }
     },
-    
+
     "ControlFlow": {
       "description": "Управление потоком",
       "color": "#2980b9",
       "subclasses": {
         "If": {
           "description": "Условный оператор",
-          "color": "#e74c3c",
+          "color": "#8e44ad",
           "type": "control",
           "is_container": true,
           "container_config": {
@@ -318,29 +318,10 @@
           "properties": {
             "value": {"type": "any", "description": "Выражение для сравнения", "required": true}
           }
-        },
-        "Case": {
-          "description": "Вариант для switch",
-          "color": "#2ecc71",
-          "type": "control",
-          "is_container": true,
-          "container_config": {
-            "orientation": "horizontal",
-            "item_width": 140,
-            "item_height": 50,
-            "spacing": 5,
-            "max_items": 50,
-            "accepts_types": ["statement"],
-            "container_type": "case"
-          },
-          "properties": {
-            "pattern": {"type": "any", "description": "Значение для сравнения", "required": true},
-            "is_default": {"type": "boolean", "description": "Вариант по умолчанию", "default": false}
-          }
         }
       }
     },
-    
+
     "MathOperations": {
       "description": "Математические операции",
       "color": "#34495e",
@@ -362,7 +343,7 @@
         }
       }
     },
-    
+
     "ComparisonOperations": {
       "description": "Операции сравнения",
       "color": "#e67e22",
@@ -384,7 +365,7 @@
         }
       }
     },
-    
+
     "LogicOperations": {
       "description": "Логические операции",
       "color": "#8e44ad",
@@ -407,7 +388,7 @@
         }
       }
     },
-    
+
     "BitOperations": {
       "description": "Битовые операции",
       "color": "#16a085",
@@ -429,7 +410,7 @@
         }
       }
     },
-    
+
     "Builtins": {
       "description": "Встроенные функции",
       "color": "#2c3e50",

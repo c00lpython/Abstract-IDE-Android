@@ -117,15 +117,45 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.tabCreated).setOnClickListener(v -> paletteFragment.showCategory("created"));
 
         canvasView.setOnBlockClickListener(blk -> { tvTerminal.append("\nSelected: " + blk.getName()); showProperties(blk); });
+
         canvasView.setOnCanvasChangeListener(new BlockCanvasView.OnCanvasChangeListener() {
-            @Override public void onBlockMoved(int id, float x, float y) { BlockModel blk = currentProject.getBlock(id); if (blk != null) { blk.getPosition().put("x", (double)x); blk.getPosition().put("y", (double)y); } }
-            @Override public void onConnectionCreated(int fromId, String fp, int toId, String tp) {
+            @Override
+            public void onBlockMoved(int id, float x, float y) {
+                BlockModel blk = currentProject.getBlock(id);
+                if (blk != null) {
+                    blk.getPosition().put("x", (double)x);
+                    blk.getPosition().put("y", (double)y);
+                }
+            }
+
+            @Override
+            public void onConnectionCreated(int fromId, String fp, int toId, String tp) {
                 Connection conn = new Connection(fromId, fp, toId, tp, UUID.randomUUID().toString(), "data", null, null);
-                currentProject.addConnection(conn); canvasView.addConnection(conn);
+                currentProject.addConnection(conn);
+                canvasView.addConnection(conn);
                 tvTerminal.append("\nConnected: " + fromId + " -> " + toId);
                 canvasView.onConnectionToContainer(fromId, toId);
             }
-            @Override public void onBlockNested(int cid, int pid) { tvTerminal.append("\nNested: " + cid + " in " + pid); explorerFragment.setProject(currentProject); }
+
+            @Override
+            public void onBlockNested(int cid, int pid) {
+                tvTerminal.append("\nNested: " + cid + " in " + pid);
+                explorerFragment.setProject(currentProject);
+            }
+
+            @Override
+            public void onBlockDelete(int blockId) {
+                BlockModel blk = currentProject.getBlock(blockId);
+                if (blk != null) {
+                    currentProject.removeBlock(blockId);
+                    if (explorerFragment != null) {
+                        explorerFragment.setProject(currentProject);
+                    }
+                    tvTerminal.append("\n🗑️ Deleted block: " + blockId);
+                }
+            }
+
+
         });
 
         addDemoBlock();

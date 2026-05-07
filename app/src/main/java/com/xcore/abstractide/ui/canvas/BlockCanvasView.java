@@ -94,6 +94,8 @@ public class BlockCanvasView extends View {
     private OnBlockClickListener blockClickListener;
     private OnCanvasChangeListener canvasChangeListener;
 
+    private GestureDetector gestureDetector;
+
     public BlockCanvasView(Context context) { super(context); init(); }
     public BlockCanvasView(Context context, AttributeSet attrs) { super(context, attrs); init(); }
 
@@ -110,6 +112,61 @@ public class BlockCanvasView extends View {
         cellPaint.setColor(CELL_COLOR); cellPaint.setStrokeWidth(1f); cellPaint.setStyle(Paint.Style.STROKE);
         portPaint.setStyle(Paint.Style.FILL);
         setFocusable(true); setFocusableInTouchMode(true);
+
+        gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public void onLongPress(MotionEvent e) {
+                float wx = toWorldX(e.getX());
+                float wy = toWorldY(e.getY());
+                DrawableConnection hitConn = findConnectionAt(wx, wy);
+                if (hitConn != null) {
+                    showConnectionMenu(e.getX(), e.getY(), hitConn);
+                }
+            }
+        });
+    }
+
+    private void showConnectionMenu(float screenX, float screenY, DrawableConnection conn) {
+        android.widget.PopupMenu popup = new android.widget.PopupMenu(getContext(), this);
+        popup.getMenu().add("Удалить связь");
+        popup.getMenu().add("Отмена");
+        popup.setOnMenuItemClickListener(item -> {
+            if (item.getTitle().equals("Удалить связь")) {
+                connections.remove(conn.id);
+                invalidate();
+            }
+            return true;
+        });
+        popup.show();
+    }
+
+    private DrawableConnection findConnectionAt(float x, float y) {
+        for (DrawableConnection dc : connections.values()) {
+            DrawableBlock from = blocks.get(dc.fromBlockId);
+            DrawableBlock to = blocks.get(dc.toBlockId);
+            if (from == null || to == null) continue;
+
+            float fx = from.x + getBlockWidth(from);
+            float fy = from.y + getBlockHeight(from) / 2;
+            float tx = to.x;
+            float ty = to.y + getBlockHeight(to) / 2;
+
+            float dist = pointToLineDistance(x, y, fx, fy, tx, ty);
+            if (dist < 20f) {
+                return dc;
+            }
+        }
+        return null;
+    }
+
+    private float pointToLineDistance(float px, float py, float x1, float y1, float x2, float y2) {
+        float lineLen = (float) Math.hypot(x2 - x1, y2 - y1);
+        if (lineLen == 0) return (float) Math.hypot(px - x1, py - y1);
+        float t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / (lineLen * lineLen);
+        t = Math.max(0, Math.min(1, t));
+        float projX = x1 + t * (x2 - x1);
+        float projY = y1 + t * (y2 - y1);
+        return (float) Math.hypot(px - projX, py - projY);
     }
 
     public static boolean isContainerType(BlockModel.BlockType type) { return type != null && CONTAINER_TYPES.contains(type.getFullName()); }
@@ -118,9 +175,32 @@ public class BlockCanvasView extends View {
     private void animateTo(DrawableBlock db, float toX, float toY) { toX=clampX(toX); toY=clampY(toY); animQueue.add(new AnimTask(db, db.x, db.y, toX, toY)); if(animQueue.size()==1) startAnimLoop(); }
     private void startAnimLoop() { postOnAnimation(new Runnable(){ @Override public void run() { if(animQueue.isEmpty()) return; Iterator<AnimTask> it=animQueue.iterator(); while(it.hasNext()){ AnimTask t=it.next(); long e=System.currentTimeMillis()-t.st; float f=Math.min(1f,(float)e/ANIM_DURATION); f=interpolator.getInterpolation(f); t.b.x=clampX(t.fx+(t.tx-t.fx)*f); t.b.y=clampY(t.fy+(t.ty-t.fy)*f); t.b.model.getPosition().put("x",(double)t.b.x); t.b.model.getPosition().put("y",(double)t.b.y); if(f>=1f) it.remove(); } invalidate(); if(!animQueue.isEmpty()) postOnAnimation(this); }}); }
 
-    private void showContextMenuForBlock(DrawableBlock db, float sx, float sy) { contextMenuBlock=db; contextMenuX=sx; contextMenuY=sy; showContextMenu=true; invalidate(); }
-    private void hideContextMenu() { showContextMenu=false; contextMenuBlock=null; invalidate(); }
-    private String getContextMenuAction(float x, float y) { if(!showContextMenu||contextMenuBlock==null) return null; float iy=contextMenuY+40; if(x>=contextMenuX&&x<=contextMenuX+200&&y>=iy&&y<=iy+40) return "exit"; return null; }
+    private void showContextMenuForBlock(DrawableBlock db, float sx, float sy) {
+        contextMenuBlock = db;
+        contextMenuX = sx;
+        contextMenuY = sy;
+        showContextMenu = true;
+        invalidate();
+    }
+
+    private void hideContextMenu() {
+        showContextMenu = false;
+        contextMenuBlock = null;
+        invalidate();
+    }
+
+    private String getContextMenuAction(float x, float y) {
+        if(!showContextMenu||contextMenuBlock==null) return null;
+
+        if(x>=contextMenuX&&x<=contextMenuX+200 && y>=contextMenuY+40 && y<=contextMenuY+80)
+            return "delete";
+
+        if(contextMenuBlock.model.getParentId() != null) {
+            if(x>=contextMenuX&&x<=contextMenuX+200 && y>=contextMenuY+84 && y<=contextMenuY+124)
+                return "exit";
+        }
+        return null;
+    }
 
     private float clampX(float x) { return Math.max(worldMinX, Math.min(worldMaxX, x)); }
     private float clampY(float y) { return Math.max(worldMinY, Math.min(worldMaxY, y)); }
@@ -141,7 +221,6 @@ public class BlockCanvasView extends View {
             if (db == null) return;
             float cx = db.x + getBlockWidth(db) / 2;
             float cy = db.y + getBlockHeight(db) / 2;
-            android.util.Log.d("CAMERA", "Center on " + blockId + " at (" + cx + "," + cy + ")");
             panX = getWidth() / 2f - cx * scaleFactor;
             panY = getHeight() / 2f - cy * scaleFactor;
             clampPan();
@@ -191,7 +270,7 @@ public class BlockCanvasView extends View {
         if (!blocks.containsKey(trueId)) {
             BlockModel tb = new BlockModel();
             tb.setId(trueId); tb.setType(new BlockModel.BlockType("code","ControlFlow","TrueBranch"));
-            tb.setName("True"); tb.setColor("#2ecc71");
+            tb.setName("True Branch"); tb.setColor("#2ecc71");
             tb.getPosition().put("x", ifBlock.x + 30.0); tb.getPosition().put("y", ifBlock.y + getBlockHeight(ifBlock) + 50.0);
             tb.getSize().put("width", 150.0); tb.getSize().put("height", 80.0);
             tb.setParentId(ifBlock.id);
@@ -203,7 +282,7 @@ public class BlockCanvasView extends View {
         if (!blocks.containsKey(falseId)) {
             BlockModel fb = new BlockModel();
             fb.setId(falseId); fb.setType(new BlockModel.BlockType("code","ControlFlow","FalseBranch"));
-            fb.setName("False"); fb.setColor("#e74c3c");
+            fb.setName("False Branch"); fb.setColor("#e74c3c");
             fb.getPosition().put("x", ifBlock.x + 250.0); fb.getPosition().put("y", ifBlock.y + getBlockHeight(ifBlock) + 50.0);
             fb.getSize().put("width", 150.0); fb.getSize().put("height", 80.0);
             fb.setParentId(ifBlock.id);
@@ -211,6 +290,54 @@ public class BlockCanvasView extends View {
             fb.initTransients(); addBlock(fb);
             ifBlock.model.getChildrenIds().add(falseId); ifBlock.model.addChild(falseId);
         }
+    }
+
+    public void addCaseToSwitch(DrawableBlock switchBlock) {
+        int caseCount = 0;
+        for (DrawableBlock block : blocks.values()) {
+            if ("case".equals(block.model.getProperties().get("_branch_type")) &&
+                    block.model.getParentId() != null &&
+                    block.model.getParentId() == switchBlock.id) {
+                caseCount++;
+            }
+        }
+
+        int caseId = (switchBlock.id * 1000 + 900 + caseCount);
+        while (blocks.containsKey(caseId)) {
+            caseId++;
+        }
+
+        BlockModel cb = new BlockModel();
+        cb.setId(caseId);
+        cb.setType(new BlockModel.BlockType("code", "ControlFlow", "Case"));
+        cb.setName("Case " + (caseCount + 1));
+        cb.setColor("#f39c12");
+
+        float lastY = switchBlock.y + getBlockHeight(switchBlock) + 50.0f;
+        for (DrawableBlock block : blocks.values()) {
+            if ("case".equals(block.model.getProperties().get("_branch_type")) &&
+                    block.model.getParentId() != null &&
+                    block.model.getParentId() == switchBlock.id) {
+                lastY = Math.max(lastY, block.y + getBlockHeight(block) + 10.0f);
+            }
+        }
+
+        cb.getPosition().put("x", (double) (switchBlock.x + 30.0f));
+        cb.getPosition().put("y", (double) lastY);
+        cb.getSize().put("width", 150.0);
+        cb.getSize().put("height", 80.0);
+        cb.setParentId(switchBlock.id);
+        cb.getProperties().put("_branch_type", "case");
+
+        // Добавляем свойства контейнера для Case
+        cb.getProperties().put("_is_container", true);
+        cb.getProperties().put("_container_config", new HashMap<>());
+        cb.getProperties().put("_container_items", new ArrayList<>());
+
+        cb.initTransients();
+        addBlock(cb);
+        switchBlock.model.getChildrenIds().add(caseId);
+        invalidate();
     }
 
     public void nestBlock(int childId, int parentId) { DrawableBlock child=blocks.get(childId),parent=blocks.get(parentId); if(child==null||parent==null||child==parent) return; if(wouldCreateCycle(child,parent)) return; if(child.model.getParentId()!=null){ DrawableBlock old=blocks.get(child.model.getParentId()); if(old!=null) old.model.getChildrenIds().remove((Integer)childId); } parent.model.getChildrenIds().add(childId); parent.model.addChild(childId); child.model.setParentId(parentId); invalidate(); if(canvasChangeListener!=null) canvasChangeListener.onBlockNested(childId,parentId); }
@@ -223,11 +350,61 @@ public class BlockCanvasView extends View {
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas); canvas.save(); canvas.translate(panX,panY); canvas.scale(scaleFactor,scaleFactor);
         drawGrid(canvas);
-        blockPaint.setColor(0x30ff0000); blockPaint.setStyle(Paint.Style.STROKE); blockPaint.setStrokeWidth(4f); canvas.drawRect(worldMinX,worldMinY,worldMaxX,worldMaxY,blockPaint);
+
         for(DrawableConnection dc:connections.values()){ DrawableBlock f=blocks.get(dc.fromBlockId),t=blocks.get(dc.toBlockId); if(f!=null&&t!=null&&!collapsedBlocks.contains(f.id)&&!collapsedBlocks.contains(t.id)) drawConnection(canvas,f,t); }
         if(isDraggingConnection&&tempLineStart!=null&&tempLineEnd!=null) canvas.drawLine(tempLineStart.x,tempLineStart.y,tempLineEnd.x,tempLineEnd.y,tempLinePaint);
-        for(DrawableBlock db:blocks.values()){ if(db.model.getParentId()==null||!collapsedBlocks.contains(db.model.getParentId())) drawBlock(canvas,db); }
-        if(showContextMenu&&contextMenuBlock!=null){ float mx=contextMenuX,my=contextMenuY,mw=200,mh=70; contextMenuRect.set(mx,my,mx+mw,my+mh); blockPaint.setColor(0xEE2d2d2d); blockPaint.setStyle(Paint.Style.FILL); canvas.drawRoundRect(contextMenuRect,12,12,blockPaint); smallTextPaint.setColor(0xFF888888); canvas.drawText(contextMenuBlock.model.getName(),mx+16,my+24,smallTextPaint); RectF eb=new RectF(mx+8,my+34,mx+192,my+62); blockPaint.setColor(0xFFe74c3c); canvas.drawRoundRect(eb,8,8,blockPaint); textPaint.setColor(Color.WHITE); textPaint.setTextSize(11f*getResources().getDisplayMetrics().density); canvas.drawText("Exit",mx+76,my+56,textPaint); textPaint.setTextSize(12f*getResources().getDisplayMetrics().density); }
+
+        for(DrawableBlock db:blocks.values()){
+            if(db.model.getParentId()==null||!collapsedBlocks.contains(db.model.getParentId()))
+                drawBlock(canvas, db);
+        }
+
+        // Рисуем линии от Switch к Case веткам
+        for(DrawableBlock db:blocks.values()) {
+            if (db.model.isContainerBlock() && ("switch".equals(db.model.getContainerType()) || "ControlFlow.Switch".equals(db.model.getType().getFullName()))) {
+                float w = getBlockWidth(db);
+                float h = getBlockHeight(db);
+                float switchCX = db.x + w / 2;
+                float switchBY = db.y + h;
+
+                for (int cid : db.model.getChildrenIds()) {
+                    DrawableBlock child = blocks.get(cid);
+                    if (child != null && "case".equals(child.model.getProperties().get("_branch_type"))) {
+                        float caseTX = child.x + getBlockWidth(child) / 2;
+                        float caseTY = child.y;
+                        inheritancePaint.setColor(0xFFf39c12);
+                        inheritancePaint.setAlpha(150);
+                        inheritancePaint.setStrokeWidth(2f);
+                        canvas.drawLine(switchCX, switchBY, caseTX, caseTY, inheritancePaint);
+                    }
+                }
+            }
+        }
+
+        if(showContextMenu&&contextMenuBlock!=null){
+            float mx=contextMenuX,my=contextMenuY,mw=200;
+            int mh = contextMenuBlock.model.getParentId() != null ? 130 : 90;
+            contextMenuRect.set(mx,my,mx+mw,my+mh);
+            blockPaint.setColor(0xEE2d2d2d);
+            blockPaint.setStyle(Paint.Style.FILL);
+            canvas.drawRoundRect(contextMenuRect,12,12,blockPaint);
+            smallTextPaint.setColor(0xFF888888);
+            canvas.drawText(contextMenuBlock.model.getName(),mx+16,my+24,smallTextPaint);
+
+            RectF delBtn = new RectF(mx+8, my+40, mx+192, my+68);
+            blockPaint.setColor(0xFFe74c3c);
+            canvas.drawRoundRect(delBtn,8,8,blockPaint);
+            textPaint.setColor(Color.WHITE);
+            canvas.drawText("Delete", mx+68, my+62, textPaint);
+
+            if(contextMenuBlock.model.getParentId() != null) {
+                RectF exitBtn = new RectF(mx+8, my+84, mx+192, my+112);
+                blockPaint.setColor(0xFFf39c12);
+                canvas.drawRoundRect(exitBtn,8,8,blockPaint);
+                canvas.drawText("Exit", mx+76, my+106, textPaint);
+            }
+            textPaint.setTextSize(12f*getResources().getDisplayMetrics().density);
+        }
         canvas.restore();
     }
 
@@ -256,130 +433,619 @@ public class BlockCanvasView extends View {
         if (name != null) canvas.drawText(prefix + name, db.x + 10, db.y + HEADER_HEIGHT - 6, textPaint);
         String type = db.model.getType() != null ? db.model.getType().getSubclassName() : "";
         if (!type.isEmpty()) canvas.drawText(type, db.x + 10, db.y + HEADER_HEIGHT + 16, smallTextPaint);
+
         String branchType = String.valueOf(db.model.getProperties().getOrDefault("_branch_type", ""));
+
+        // Порты: входной красный для всех, кроме True/False; выходной зеленый только для не-Case
         if (!"true".equals(branchType) && !"false".equals(branchType)) {
-            portPaint.setColor(PORT_INPUT_COLOR); canvas.drawCircle(db.x, db.y + h/2, PORT_RADIUS, portPaint);
-            portPaint.setColor(PORT_OUTPUT_COLOR); canvas.drawCircle(db.x + w, db.y + h/2, PORT_RADIUS, portPaint);
+            portPaint.setColor(PORT_INPUT_COLOR);
+            canvas.drawCircle(db.x, db.y + h/2, PORT_RADIUS, portPaint);
+
+            if (!"case".equals(branchType)) {
+                portPaint.setColor(PORT_OUTPUT_COLOR);
+                canvas.drawCircle(db.x + w, db.y + h/2, PORT_RADIUS, portPaint);
+            }
         }
 
         if (db.model.isContainerBlock()) {
             blockPaint.setColor(Color.WHITE); blockPaint.setStyle(Paint.Style.STROKE); blockPaint.setStrokeWidth(2f);
-            blockPaint.setPathEffect(new DashPathEffect(new float[]{8, 4}, 0)); canvas.drawRoundRect(rect, BLOCK_RADIUS, BLOCK_RADIUS, blockPaint); blockPaint.setPathEffect(null);
-            String ct = db.model.getContainerType(); int cc = db.model.getChildrenIds().size();
+            blockPaint.setPathEffect(new DashPathEffect(new float[]{8, 4}, 0));
+            canvas.drawRoundRect(rect, BLOCK_RADIUS, BLOCK_RADIUS, blockPaint);
+            blockPaint.setPathEffect(null);
 
-            if ("dictionary".equals(ct)) {
+            String ct = db.model.getContainerType();
+            int cc = db.model.getChildrenIds().size();
+
+            // Case блок - ячейка СПРАВА (как у List)
+            if ("case".equals(branchType)) {
+                float cellW = 100, cellH = h - 16;
+                float cellX = db.x + w + 10, cellY = db.y + 8;
+                RectF cell = new RectF(cellX, cellY, cellX + cellW, cellY + cellH);
+
+                // Рисуем ячейку
+                cellPaint.setColor(0x18000000);
+                cellPaint.setStyle(Paint.Style.FILL);
+                canvas.drawRoundRect(cell, 8, 8, cellPaint);
+                cellPaint.setColor(CELL_BORDER_COLOR);
+                cellPaint.setStyle(Paint.Style.STROKE);
+                canvas.drawRoundRect(cell, 8, 8, cellPaint);
+
+                // Рисуем вложенные блоки в ячейке
+                float childY = cellY + 5;
+                for (int cid : db.model.getChildrenIds()) {
+                    DrawableBlock child = blocks.get(cid);
+                    if (child != null) {
+                        child.x = cellX + 5;
+                        child.y = childY;
+                        child.model.getPosition().put("x", (double) child.x);
+                        child.model.getPosition().put("y", (double) child.y);
+                        child.model.getSize().put("width", (double) (cellW - 10));
+                        child.model.getSize().put("height", 50.0);
+                        drawBlock(canvas, child);
+                        childY += 60;
+                    }
+                }
+
+                if (cc == 0) {
+                    smallTextPaint.setColor(0xFF888888);
+                    canvas.drawText("Drop value here", cellX + 10, cellY + cellH / 2 + 5, smallTextPaint);
+                }
+            }
+            // Dictionary
+            else if ("dictionary".equals(ct)) {
                 float cellH=24,cellPadding=8; float startX=db.x+w+10; float startY=db.y+8; int pairCount=Math.max(1,(cc+1)/2);
                 float maxKeyW=60,maxValW=60;
-                for(int i=0;i<cc;i++){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(i));
-                    if(child!=null){ String cn=child.model.getName(); float tw=textPaint.measureText(cn!=null?cn:"?"); float bw=tw+30;
-                        if(i%2==0)maxKeyW=Math.max(maxKeyW,bw); else maxValW=Math.max(maxValW,bw); } }
+                for(int i=0;i<cc;i++){
+                    DrawableBlock child=blocks.get(db.model.getChildrenIds().get(i));
+                    if(child!=null && !"case".equals(child.model.getProperties().get("_branch_type"))){
+                        String cn=child.model.getName();
+                        float tw=textPaint.measureText(cn!=null?cn:"?");
+                        float bw=tw+30;
+                        if(i%2==0) maxKeyW=Math.max(maxKeyW,bw);
+                        else maxValW=Math.max(maxValW,bw);
+                    }
+                }
                 final float cellW=Math.max(maxKeyW,maxValW)+cellPadding*2;
-                for(int i=0;i<pairCount;i++){ float cellX=startX+i*(cellW+6);
-                    RectF cell=new RectF(cellX,startY,cellX+cellW,startY+cellH); cellPaint.setColor(0x00000000);cellPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,6,6,cellPaint);
+                for(int i=0;i<pairCount;i++){
+                    float cellX=startX+i*(cellW+6);
+                    RectF cell=new RectF(cellX,startY,cellX+cellW,startY+cellH);
+                    cellPaint.setColor(0x00000000);cellPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,6,6,cellPaint);
                     cellPaint.setColor(0xFFe67e22);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(cell,6,6,cellPaint);
                     smallTextPaint.setColor(0xFFe67e22);canvas.drawText("Key",cellX+6,startY+cellH/2+4,smallTextPaint);
-                    int keyIdx=i*2; if(keyIdx<cc){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(keyIdx));
-                        if(child!=null){ child.model.getSize().put("width",(double)(cellW-cellPadding*2));child.model.getSize().put("height",(double)(cellH-4.0));child.x=cellX+cellPadding;child.y=startY+cellH+2;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);drawBlock(canvas,child); } } }
+                    int keyIdx=i*2;
+                    if(keyIdx<cc){
+                        DrawableBlock child=blocks.get(db.model.getChildrenIds().get(keyIdx));
+                        if(child!=null && !"case".equals(child.model.getProperties().get("_branch_type"))){
+                            child.model.getSize().put("width",(double)(cellW-cellPadding*2));
+                            child.model.getSize().put("height",(double)(cellH-4.0));
+                            child.x=cellX+cellPadding;
+                            child.y=startY+cellH+2;
+                            child.model.getPosition().put("x",(double)child.x);
+                            child.model.getPosition().put("y",(double)child.y);
+                            drawBlock(canvas,child);
+                        }
+                    }
+                }
                 float valueY=startY+cellH+8;
-                for(int i=0;i<pairCount;i++){ float cellX=startX+i*(cellW+6);
-                    RectF cell=new RectF(cellX,valueY,cellX+cellW,valueY+cellH); cellPaint.setColor(0x00000000);cellPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,6,6,cellPaint);
+                for(int i=0;i<pairCount;i++){
+                    float cellX=startX+i*(cellW+6);
+                    RectF cell=new RectF(cellX,valueY,cellX+cellW,valueY+cellH);
+                    cellPaint.setColor(0x00000000);cellPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,6,6,cellPaint);
                     cellPaint.setColor(0xFF27ae60);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(cell,6,6,cellPaint);
                     smallTextPaint.setColor(0xFF27ae60);canvas.drawText("Value",cellX+4,valueY+cellH/2+4,smallTextPaint);
-                    int valIdx=i*2+1; if(valIdx<cc){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(valIdx));
-                        if(child!=null){ child.model.getSize().put("width",(double)(cellW-cellPadding*2));child.model.getSize().put("height",(double)(cellH-4.0));child.x=cellX+cellPadding;child.y=valueY+cellH+2;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);drawBlock(canvas,child); } } }
-            } else if ("list".equals(ct) || "array".equals(ct)) {
+                    int valIdx=i*2+1;
+                    if(valIdx<cc){
+                        DrawableBlock child=blocks.get(db.model.getChildrenIds().get(valIdx));
+                        if(child!=null && !"case".equals(child.model.getProperties().get("_branch_type"))){
+                            child.model.getSize().put("width",(double)(cellW-cellPadding*2));
+                            child.model.getSize().put("height",(double)(cellH-4.0));
+                            child.x=cellX+cellPadding;
+                            child.y=valueY+cellH+2;
+                            child.model.getPosition().put("x",(double)child.x);
+                            child.model.getPosition().put("y",(double)child.y);
+                            drawBlock(canvas,child);
+                        }
+                    }
+                }
+            }
+            // List / Array
+            else if ("list".equals(ct) || "array".equals(ct)) {
                 float cw=100,ch2=h-16; int tc=Math.max(1,cc+1);
-                for(int i=0;i<tc;i++){ float cx=db.x+w+10+i*(cw+8),cy=db.y+8; RectF cell=new RectF(cx,cy,cx+cw,cy+ch2);
-                    if(i<cc){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(i)); if(child!=null){ blockPaint.setColor(0x18000000);blockPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,8,8,blockPaint); child.x=cx+4;child.y=cy+4;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);child.model.getSize().put("width",cw-8.0);child.model.getSize().put("height",ch2-8.0);drawBlock(canvas,child); } }
-                    else{ cellPaint.setColor(CELL_COLOR);canvas.drawRoundRect(cell,8,8,cellPaint);cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(cell,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);smallTextPaint.setColor(0xFF666666);canvas.drawText("["+i+"]",cx+30,cy+ch2/2+4,smallTextPaint); } }
-            } else if ("if".equals(ct) || "ControlFlow.If".equals(db.model.getType().getFullName())) {
+                for(int i=0;i<tc;i++){
+                    float cx=db.x+w+10+i*(cw+8),cy=db.y+8;
+                    RectF cell=new RectF(cx,cy,cx+cw,cy+ch2);
+                    if(i<cc){
+                        DrawableBlock child=blocks.get(db.model.getChildrenIds().get(i));
+                        if(child!=null){
+                            blockPaint.setColor(0x18000000);
+                            blockPaint.setStyle(Paint.Style.FILL);
+                            canvas.drawRoundRect(cell,8,8,blockPaint);
+                            child.x=cx+4;
+                            child.y=cy+4;
+                            child.model.getPosition().put("x",(double)child.x);
+                            child.model.getPosition().put("y",(double)child.y);
+                            child.model.getSize().put("width",cw-8.0);
+                            child.model.getSize().put("height",ch2-8.0);
+                            drawBlock(canvas,child);
+                        }
+                    } else {
+                        cellPaint.setColor(CELL_COLOR);
+                        canvas.drawRoundRect(cell,8,8,cellPaint);
+                        cellPaint.setColor(CELL_BORDER_COLOR);
+                        cellPaint.setStyle(Paint.Style.STROKE);
+                        canvas.drawRoundRect(cell,8,8,cellPaint);
+                        cellPaint.setStyle(Paint.Style.FILL);
+                        smallTextPaint.setColor(0xFF666666);
+                        canvas.drawText("["+i+"]",cx+30,cy+ch2/2+4,smallTextPaint);
+                    }
+                }
+            }
+            // If
+            else if ("if".equals(ct) || "ControlFlow.If".equals(db.model.getType().getFullName())) {
                 float condW=180,condH=h-16;
                 RectF condCell=new RectF(db.x+w+10,db.y+8,db.x+w+10+condW,db.y+8+condH);
                 cellPaint.setColor(0x00000000);canvas.drawRoundRect(condCell,8,8,cellPaint);
                 cellPaint.setColor(0xFFf39c12);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(condCell,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);
                 smallTextPaint.setColor(0xFFf39c12);canvas.drawText("Condition",db.x+w+30,db.y+condH/2+12,smallTextPaint);
-                for(int cid:db.model.getChildrenIds()){ DrawableBlock child=blocks.get(cid);
-                    if(child!=null){ String bt=String.valueOf(child.model.getProperties().getOrDefault("_branch_type",""));
+                for(int cid:db.model.getChildrenIds()){
+                    DrawableBlock child=blocks.get(cid);
+                    if(child!=null){
+                        String bt=String.valueOf(child.model.getProperties().getOrDefault("_branch_type",""));
                         if("true".equals(bt)||"false".equals(bt)){
                             float ifCX=db.x+w/2,ifBY=db.y+h,brTX=child.x+getBlockWidth(child)/2,brTY=child.y;
                             inheritancePaint.setColor("true".equals(bt)?0xFF2ecc71:0xFFe74c3c);
-                            inheritancePaint.setAlpha(200);inheritancePaint.setStrokeWidth(3f);
+                            inheritancePaint.setAlpha(200);
+                            inheritancePaint.setStrokeWidth(3f);
                             canvas.drawLine(ifCX,ifBY,brTX,brTY,inheritancePaint);
                         }
                     }
                 }
-            } else if ("function".equals(ct) || "method".equals(ct)) {
+            }
+            // Switch
+            else if ("switch".equals(ct) || "ControlFlow.Switch".equals(db.model.getType().getFullName())) {
+                float btnX = db.x + w - 30, btnY = db.y + 6;
+                buttonPaint.setColor(0xFFf39c12);
+                canvas.drawCircle(btnX, btnY, 10, buttonPaint);
+                smallTextPaint.setColor(0xFFffffff);
+                canvas.drawText("+", btnX - 5, btnY + 6, smallTextPaint);
+
+                float exprW = 180, exprH = h - 16;
+                RectF exprCell = new RectF(db.x + w + 10, db.y + 8, db.x + w + 10 + exprW, db.y + 8 + exprH);
+                cellPaint.setColor(0x00000000);
+                canvas.drawRoundRect(exprCell, 8, 8, cellPaint);
+                cellPaint.setColor(0xFFf39c12);
+                cellPaint.setStyle(Paint.Style.STROKE);
+                canvas.drawRoundRect(exprCell, 8, 8, cellPaint);
+                cellPaint.setStyle(Paint.Style.FILL);
+                smallTextPaint.setColor(0xFFf39c12);
+                canvas.drawText("Expression", db.x + w + 30, db.y + exprH / 2 + 12, smallTextPaint);
+            }
+            // Function / Method
+            else if ("function".equals(ct) || "method".equals(ct)) {
                 float cw=120,ch2=h-16;
-                RectF pc=new RectF(db.x+w+10,db.y+8,db.x+w+10+cw,db.y+8+ch2); cellPaint.setColor(0xFF9b59b6);canvas.drawRoundRect(pc,8,8,cellPaint);
+                RectF pc=new RectF(db.x+w+10,db.y+8,db.x+w+10+cw,db.y+8+ch2);
+                cellPaint.setColor(0xFF9b59b6);canvas.drawRoundRect(pc,8,8,cellPaint);
                 cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(pc,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);
                 smallTextPaint.setColor(0xFFffffff);canvas.drawText("Params",db.x+w+30,db.y+ch2/2+8,smallTextPaint);
-                RectF bc=new RectF(db.x+w+10+cw+8,db.y+8,db.x+w+10+cw*2+8,db.y+8+ch2); cellPaint.setColor(0xFF34495e);canvas.drawRoundRect(bc,8,8,cellPaint);
+                RectF bc=new RectF(db.x+w+10+cw+8,db.y+8,db.x+w+10+cw*2+8,db.y+8+ch2);
+                cellPaint.setColor(0xFF34495e);canvas.drawRoundRect(bc,8,8,cellPaint);
                 cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(bc,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);
                 smallTextPaint.setColor(0xFFffffff);canvas.drawText("Body",db.x+w+cw+30,db.y+ch2/2+8,smallTextPaint);
-            } else {
+            }
+            // Другие контейнеры
+            else {
                 float cw=100,ch2=h-16; int tc=Math.max(1,cc+1);
-                for(int i=0;i<tc;i++){ float cx=db.x+w+10+i*(cw+8),cy=db.y+8; RectF cell=new RectF(cx,cy,cx+cw,cy+ch2);
-                    if(i<cc){ DrawableBlock child=blocks.get(db.model.getChildrenIds().get(i)); if(child!=null){ blockPaint.setColor(0x18000000);blockPaint.setStyle(Paint.Style.FILL);canvas.drawRoundRect(cell,8,8,blockPaint); child.x=cx+4;child.y=cy+4;child.model.getPosition().put("x",(double)child.x);child.model.getPosition().put("y",(double)child.y);child.model.getSize().put("width",cw-8.0);child.model.getSize().put("height",ch2-8.0);drawBlock(canvas,child); } }
-                    else{ cellPaint.setColor(CELL_COLOR);canvas.drawRoundRect(cell,8,8,cellPaint);cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(cell,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);smallTextPaint.setColor(0xFF666666);canvas.drawText("Empty",cx+20,cy+ch2/2+4,smallTextPaint); } }
+                for(int i=0;i<tc;i++){
+                    float cx=db.x+w+10+i*(cw+8),cy=db.y+8;
+                    RectF cell=new RectF(cx,cy,cx+cw,cy+ch2);
+                    if(i<cc){
+                        DrawableBlock child=blocks.get(db.model.getChildrenIds().get(i));
+                        if(child!=null){
+                            blockPaint.setColor(0x18000000);
+                            blockPaint.setStyle(Paint.Style.FILL);
+                            canvas.drawRoundRect(cell,8,8,blockPaint);
+                            child.x=cx+4;
+                            child.y=cy+4;
+                            child.model.getPosition().put("x",(double)child.x);
+                            child.model.getPosition().put("y",(double)child.y);
+                            child.model.getSize().put("width",cw-8.0);
+                            child.model.getSize().put("height",ch2-8.0);
+                            drawBlock(canvas,child);
+                        }
+                    } else {
+                        cellPaint.setColor(CELL_COLOR);
+                        canvas.drawRoundRect(cell,8,8,cellPaint);
+                        cellPaint.setColor(CELL_BORDER_COLOR);
+                        cellPaint.setStyle(Paint.Style.STROKE);
+                        canvas.drawRoundRect(cell,8,8,cellPaint);
+                        cellPaint.setStyle(Paint.Style.FILL);
+                        smallTextPaint.setColor(0xFF666666);
+                        canvas.drawText("Empty",cx+20,cy+ch2/2+4,smallTextPaint);
+                    }
+                }
             }
         }
 
+        // Дочерние блоки (не контейнеры)
         if (!db.model.getChildrenIds().isEmpty() && !db.model.isContainerBlock()) {
             float cy=db.y+h+8,cx=db.x+CHILD_INDENT;int idx=0;
-            for(int cid:db.model.getChildrenIds()){ DrawableBlock child=blocks.get(cid);if(child!=null){
-                float cw=getBlockWidth(child),ch2=getBlockHeight(child);child.x=cx;child.y=cy;
-                child.model.getPosition().put("x",(double)cx);child.model.getPosition().put("y",(double)cy);
-                blockPaint.setColor(idx%2==0?0x18000000:0x10000000);blockPaint.setStyle(Paint.Style.FILL);
-                canvas.drawRoundRect(new RectF(cx-5,cy-2,cx+cw+40,cy+ch2+2),6,6,blockPaint);
-                smallTextPaint.setColor(0xFF888888);canvas.drawText((idx+1)+".",cx-18,cy+ch2/2+4,smallTextPaint);
-                drawBlock(canvas,child);idx++;cy+=ch2+4;
-            }}
+            for(int cid:db.model.getChildrenIds()){
+                DrawableBlock child=blocks.get(cid);
+                if(child!=null && !"case".equals(child.model.getProperties().get("_branch_type"))){
+                    float cw=getBlockWidth(child),ch2=getBlockHeight(child);
+                    child.x=cx;
+                    child.y=cy;
+                    child.model.getPosition().put("x",(double)cx);
+                    child.model.getPosition().put("y",(double)cy);
+                    blockPaint.setColor(idx%2==0?0x18000000:0x10000000);
+                    blockPaint.setStyle(Paint.Style.FILL);
+                    canvas.drawRoundRect(new RectF(cx-5,cy-2,cx+cw+40,cy+ch2+2),6,6,blockPaint);
+                    smallTextPaint.setColor(0xFF888888);
+                    canvas.drawText((idx+1)+".",cx-18,cy+ch2/2+4,smallTextPaint);
+                    drawBlock(canvas,child);
+                    idx++;
+                    cy+=ch2+4;
+                }
+            }
         }
-        if (!db.model.getChildrenIds().isEmpty()) { smallTextPaint.setColor(0xFF888888);canvas.drawText("🏠"+db.model.getChildrenIds().size(),db.x+6,db.y+HEADER_HEIGHT-6,smallTextPaint); }
-        if (!db.model.getChildrenIds().isEmpty()) { boolean col=collapsedBlocks.contains(db.id);buttonPaint.setColor(0xFF3a3a3a);canvas.drawCircle(db.x+w-16,db.y+10,8,buttonPaint);smallTextPaint.setColor(0xFFcccccc);canvas.drawText(col?"+":"−",db.x+w-20,db.y+14,smallTextPaint); }
+
+        if (!db.model.getChildrenIds().isEmpty()) {
+            smallTextPaint.setColor(0xFF888888);
+            canvas.drawText("🏠"+db.model.getChildrenIds().size(),db.x+6,db.y+HEADER_HEIGHT-6,smallTextPaint);
+        }
+        if (!db.model.getChildrenIds().isEmpty()) {
+            boolean col=collapsedBlocks.contains(db.id);
+            buttonPaint.setColor(0xFF3a3a3a);
+            canvas.drawCircle(db.x+w-16,db.y+10,8,buttonPaint);
+            smallTextPaint.setColor(0xFFcccccc);
+            canvas.drawText(col?"+":"−",db.x+w-20,db.y+14,smallTextPaint);
+        }
         if (db.selected) canvas.drawRoundRect(new RectF(rect.left-2,rect.top-2,rect.right+2,rect.bottom+2),BLOCK_RADIUS+2,BLOCK_RADIUS+2,selectionPaint);
-        if (db==nestTarget&&draggingBlock!=null&&db!=swapTarget){nestPaint.setColor(nestingReady?NEST_READY_COLOR:Color.argb((int)(80+175*Math.min(1f,(System.currentTimeMillis()-nestHoverStart)/NEST_HOVER_DELAY)),46,204,113));nestPaint.setPathEffect(new DashPathEffect(new float[]{10,5},0));canvas.drawRoundRect(new RectF(rect.left-8,rect.top-8,rect.right+8,rect.bottom+8),BLOCK_RADIUS+8,BLOCK_RADIUS+8,nestPaint);nestPaint.setPathEffect(null);smallTextPaint.setColor(nestingReady?NEST_READY_COLOR:0xFFaaaaaa);canvas.drawText(nestingReady?"▼ RELEASE TO NEST ▼":"▼ HOLD TO NEST ▼",db.x+w/2-80,db.y-12,smallTextPaint);}
-        if (db==swapTarget&&draggingBlock!=null){swapPaint.setPathEffect(new DashPathEffect(new float[]{6,3},0));canvas.drawRoundRect(new RectF(rect.left-4,rect.top-4,rect.right+4,rect.bottom+4),BLOCK_RADIUS+4,BLOCK_RADIUS+4,swapPaint);swapPaint.setPathEffect(null);smallTextPaint.setColor(SWAP_COLOR);canvas.drawText("⇄ SWAP",db.x+w/2-25,db.y-8,smallTextPaint);}
+        if (db==nestTarget&&draggingBlock!=null&&db!=swapTarget){
+            nestPaint.setColor(nestingReady?NEST_READY_COLOR:Color.argb((int)(80+175*Math.min(1f,(System.currentTimeMillis()-nestHoverStart)/NEST_HOVER_DELAY)),46,204,113));
+            nestPaint.setPathEffect(new DashPathEffect(new float[]{10,5},0));
+            canvas.drawRoundRect(new RectF(rect.left-8,rect.top-8,rect.right+8,rect.bottom+8),BLOCK_RADIUS+8,BLOCK_RADIUS+8,nestPaint);
+            nestPaint.setPathEffect(null);
+            smallTextPaint.setColor(nestingReady?NEST_READY_COLOR:0xFFaaaaaa);
+            canvas.drawText(nestingReady?"▼ RELEASE TO NEST ▼":"▼ HOLD TO NEST ▼",db.x+w/2-80,db.y-12,smallTextPaint);
+        }
+        if (db==swapTarget&&draggingBlock!=null){
+            swapPaint.setPathEffect(new DashPathEffect(new float[]{6,3},0));
+            canvas.drawRoundRect(new RectF(rect.left-4,rect.top-4,rect.right+4,rect.bottom+4),BLOCK_RADIUS+4,BLOCK_RADIUS+4,swapPaint);
+            swapPaint.setPathEffect(null);
+            smallTextPaint.setColor(SWAP_COLOR);
+            canvas.drawText("⇄ SWAP",db.x+w/2-25,db.y-8,smallTextPaint);
+        }
     }
 
-    private void drawConnection(Canvas canvas, DrawableBlock from, DrawableBlock to) { float fw=getBlockWidth(from),fh=getBlockHeight(from),tw=getBlockWidth(to),th=getBlockHeight(to); PointF s=new PointF(from.x+fw,from.y+fh/2),e=new PointF(to.x,to.y+th/2); connectionPath.reset();connectionPath.moveTo(s.x,s.y);float dx=e.x-s.x;connectionPath.cubicTo(s.x+dx*0.4f,s.y,e.x-dx*0.4f,e.y,e.x,e.y);canvas.drawPath(connectionPath,connectionPaint); float ang=(float)Math.atan2(e.y-s.y,e.x-s.x),sz=12,sw=6; Path arrow=new Path();arrow.moveTo(e.x,e.y);arrow.lineTo(e.x-sz*(float)Math.cos(ang-0.4f),e.y-sz*(float)Math.sin(ang-0.4f));arrow.lineTo(e.x-sw*(float)Math.cos(ang+Math.PI/2),e.y-sw*(float)Math.sin(ang+Math.PI/2));arrow.lineTo(e.x-sz*(float)Math.cos(ang+0.4f),e.y-sz*(float)Math.sin(ang+0.4f));arrow.close(); connectionPaint.setStyle(Paint.Style.FILL);canvas.drawPath(arrow,connectionPaint);connectionPaint.setStyle(Paint.Style.STROKE); }
+    private void drawConnection(Canvas canvas, DrawableBlock from, DrawableBlock to) {
+        float fw=getBlockWidth(from),fh=getBlockHeight(from),tw=getBlockWidth(to),th=getBlockHeight(to);
+        PointF s=new PointF(from.x+fw,from.y+fh/2),e=new PointF(to.x,to.y+th/2);
+        connectionPath.reset();
+        connectionPath.moveTo(s.x,s.y);
+        float dx=e.x-s.x;
+        connectionPath.cubicTo(s.x+dx*0.4f,s.y,e.x-dx*0.4f,e.y,e.x,e.y);
+        canvas.drawPath(connectionPath,connectionPaint);
+        float ang=(float)Math.atan2(e.y-s.y,e.x-s.x),sz=12,sw=6;
+        Path arrow=new Path();
+        arrow.moveTo(e.x,e.y);
+        arrow.lineTo(e.x-sz*(float)Math.cos(ang-0.4f),e.y-sz*(float)Math.sin(ang-0.4f));
+        arrow.lineTo(e.x-sw*(float)Math.cos(ang+Math.PI/2),e.y-sw*(float)Math.sin(ang+Math.PI/2));
+        arrow.lineTo(e.x-sz*(float)Math.cos(ang+0.4f),e.y-sz*(float)Math.sin(ang+0.4f));
+        arrow.close();
+        connectionPaint.setStyle(Paint.Style.FILL);
+        canvas.drawPath(arrow,connectionPaint);
+        connectionPaint.setStyle(Paint.Style.STROKE);
+    }
 
-    @Override public boolean onTouchEvent(MotionEvent event) {
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        gestureDetector.onTouchEvent(event);
+
         float wx=toWorldX(event.getX()),wy=toWorldY(event.getY());
         switch(event.getActionMasked()){
             case MotionEvent.ACTION_DOWN:
-                if(showContextMenu){ String action=getContextMenuAction(event.getX(),event.getY()); if(action!=null&&contextMenuBlock!=null&&"exit".equals(action)&&contextMenuBlock.model.getParentId()!=null){ DrawableBlock parent=blocks.get(contextMenuBlock.model.getParentId()); if(parent!=null){parent.model.getChildrenIds().remove((Integer)contextMenuBlock.id);contextMenuBlock.model.setParentId(null);if(canvasChangeListener!=null)canvasChangeListener.onBlockNested(contextMenuBlock.id,-1);} } hideContextMenu(); return true; }
-                long now=System.currentTimeMillis(); if(now-lastClickTime<DOUBLE_CLICK_INTERVAL){ DrawableBlock dblHit=findBlockAt(wx,wy); if(dblHit!=null&&dblHit.model.getParentId()!=null){ showContextMenuForBlock(dblHit,event.getX(),event.getY()); lastClickTime=0; return true; } } lastClickTime=now;
+                if(showContextMenu){
+                    String action = getContextMenuAction(event.getX(), event.getY());
+                    if("delete".equals(action) && contextMenuBlock != null) {
+                        removeBlock(contextMenuBlock.id);
+                        if(canvasChangeListener != null)
+                            canvasChangeListener.onBlockDelete(contextMenuBlock.id);
+                        hideContextMenu();
+                        return true;
+                    } else if("exit".equals(action) && contextMenuBlock != null && contextMenuBlock.model.getParentId() != null) {
+                        DrawableBlock parent = blocks.get(contextMenuBlock.model.getParentId());
+                        if(parent != null) {
+                            parent.model.getChildrenIds().remove((Integer)contextMenuBlock.id);
+                            contextMenuBlock.model.setParentId(null);
+                            if(canvasChangeListener != null)
+                                canvasChangeListener.onBlockNested(contextMenuBlock.id, -1);
+                        }
+                        hideContextMenu();
+                        return true;
+                    }
+                    hideContextMenu();
+                    return true;
+                }
+                long now=System.currentTimeMillis();
+                if(now-lastClickTime<DOUBLE_CLICK_INTERVAL){
+                    DrawableBlock dblHit=findBlockAt(wx,wy);
+                    if(dblHit != null){
+                        showContextMenuForBlock(dblHit,event.getX(),event.getY());
+                        lastClickTime=0;
+                        return true;
+                    }
+                }
+                lastClickTime=now;
                 lastTouchX=event.getX();lastTouchY=event.getY();
-                PortHit ph=findPortAt(wx,wy); if(ph!=null){isDraggingConnection=true;connectionSource=ph.block;dragStartPort=ph.port;tempLineStart=getPortPos(ph.block,ph.port);tempLineEnd=new PointF(wx,wy);return true;}
-                DrawableBlock hit=findBlockAt(wx,wy); if(hit!=null){if(isCollapseBtn(wx,wy,hit)){toggleCollapse(hit.id);return true;}isDraggingBlock=true;draggingBlock=hit;dragOffsetX=wx-hit.x;dragOffsetY=wy-hit.y;for(DrawableBlock db:blocks.values())db.selected=(db==hit);if(blockClickListener!=null)blockClickListener.onBlockClick(hit.model);return true;}
-                isPanning=true;return true;
-            case MotionEvent.ACTION_POINTER_DOWN: if(event.getPointerCount()==2){initialSpan=spacing(event);}return true;
-            case MotionEvent.ACTION_MOVE: if(event.getPointerCount()==2){float ns=spacing(event);scaleFactor*=ns/initialSpan;scaleFactor=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,scaleFactor));initialSpan=ns;invalidate();return true;} if(isDraggingConnection){tempLineEnd=new PointF(wx,wy);invalidate();return true;} if(isDraggingBlock&&draggingBlock!=null){draggingBlock.x=clampX(wx-dragOffsetX);draggingBlock.y=clampY(wy-dragOffsetY);draggingBlock.model.getPosition().put("x",(double)draggingBlock.x);draggingBlock.model.getPosition().put("y",(double)draggingBlock.y);checkNesting(draggingBlock,wx,wy);invalidate();return true;} if(isPanning){panX+=event.getX()-lastTouchX;panY+=event.getY()-lastTouchY;clampPan();lastTouchX=event.getX();lastTouchY=event.getY();invalidate();return true;} break;
-            case MotionEvent.ACTION_UP: if(isDraggingConnection){PortHit tgt=findPortAt(wx,wy);if(tgt!=null&&connectionSource!=null&&tgt.block!=connectionSource){String fp=dragStartPort,tp=tgt.port;DrawableBlock fb=connectionSource,tb=tgt.block;if("input".equals(fp)&&"output".equals(tp)){DrawableBlock tmp=fb;fb=tb;tb=tmp;fp="output";tp="input";}if("output".equals(fp)&&"input".equals(tp)&&canvasChangeListener!=null)canvasChangeListener.onConnectionCreated(fb.id,fp,tb.id,tp);}resetState();invalidate();return true;} if(isDraggingBlock&&draggingBlock!=null){handleDrop();if(canvasChangeListener!=null)canvasChangeListener.onBlockMoved(draggingBlock.id,draggingBlock.x,draggingBlock.y);}resetState();invalidate();return true;
+                PortHit ph=findPortAt(wx,wy);
+                if(ph!=null){
+                    isDraggingConnection=true;
+                    connectionSource=ph.block;
+                    dragStartPort=ph.port;
+                    tempLineStart=getPortPos(ph.block,ph.port);
+                    tempLineEnd=new PointF(wx,wy);
+                    return true;
+                }
+                DrawableBlock hit=findBlockAt(wx,wy);
+                if(hit!=null){
+                    if ("switch".equals(hit.model.getContainerType()) || "ControlFlow.Switch".equals(hit.model.getType().getFullName())) {
+                        float btnX = hit.x + getBlockWidth(hit) - 30, btnY = hit.y + 6;
+                        if (Math.hypot(wx - btnX, wy - btnY) <= 14) {
+                            addCaseToSwitch(hit);
+                            return true;
+                        }
+                    }
+                    if(isCollapseBtn(wx,wy,hit)){
+                        toggleCollapse(hit.id);
+                        return true;
+                    }
+                    isDraggingBlock=true;
+                    draggingBlock=hit;
+                    dragOffsetX=wx-hit.x;
+                    dragOffsetY=wy-hit.y;
+                    for(DrawableBlock db:blocks.values()) db.selected=(db==hit);
+                    if(blockClickListener!=null) blockClickListener.onBlockClick(hit.model);
+                    return true;
+                }
+                isPanning=true;
+                return true;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if(event.getPointerCount()==2){
+                    initialSpan=spacing(event);
+                }
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                if(event.getPointerCount()==2){
+                    float ns=spacing(event);
+                    scaleFactor*=ns/initialSpan;
+                    scaleFactor=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,scaleFactor));
+                    initialSpan=ns;
+                    invalidate();
+                    return true;
+                }
+                if(isDraggingConnection){
+                    tempLineEnd=new PointF(wx,wy);
+                    invalidate();
+                    return true;
+                }
+                if(isDraggingBlock&&draggingBlock!=null){
+                    draggingBlock.x=clampX(wx-dragOffsetX);
+                    draggingBlock.y=clampY(wy-dragOffsetY);
+                    draggingBlock.model.getPosition().put("x",(double)draggingBlock.x);
+                    draggingBlock.model.getPosition().put("y",(double)draggingBlock.y);
+                    checkNesting(draggingBlock,wx,wy);
+                    invalidate();
+                    return true;
+                }
+                if(isPanning){
+                    panX+=event.getX()-lastTouchX;
+                    panY+=event.getY()-lastTouchY;
+                    clampPan();
+                    lastTouchX=event.getX();
+                    lastTouchY=event.getY();
+                    invalidate();
+                    return true;
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+                if(isDraggingConnection){
+                    PortHit tgt=findPortAt(wx,wy);
+                    if(tgt!=null&&connectionSource!=null&&tgt.block!=connectionSource){
+                        String fp=dragStartPort,tp=tgt.port;
+                        DrawableBlock fb=connectionSource,tb=tgt.block;
+                        if("input".equals(fp)&&"output".equals(tp)){
+                            DrawableBlock tmp=fb;
+                            fb=tb;
+                            tb=tmp;
+                            fp="output";
+                            tp="input";
+                        }
+                        if("output".equals(fp)&&"input".equals(tp)&&canvasChangeListener!=null)
+                            canvasChangeListener.onConnectionCreated(fb.id,fp,tb.id,tp);
+                    }
+                    resetState();
+                    invalidate();
+                    return true;
+                }
+                if(isDraggingBlock&&draggingBlock!=null){
+                    handleDrop();
+                    if(canvasChangeListener!=null)
+                        canvasChangeListener.onBlockMoved(draggingBlock.id,draggingBlock.x,draggingBlock.y);
+                }
+                resetState();
+                invalidate();
+                return true;
         }
         return super.onTouchEvent(event);
     }
 
-    private void resetState(){isDraggingBlock=false;isDraggingConnection=false;isPanning=false;draggingBlock=null;connectionSource=null;dragStartPort=null;tempLineStart=null;tempLineEnd=null;nestTarget=null;swapTarget=null;nestingReady=false;}
-    private void checkNesting(DrawableBlock dragged,float wx,float wy){nestTarget=null;swapTarget=null;for(DrawableBlock db:blocks.values()){if(db==dragged)continue;float w=getBlockWidth(db),h=getBlockHeight(db);if(wx>=db.x&&wx<=db.x+w&&wy>=db.y&&wy<=db.y+h){if(dragged.model.getParentId()!=null&&db.model.getParentId()!=null&&dragged.model.getParentId().equals(db.model.getParentId())){swapTarget=db;nestingReady=true;return;}if(!wouldCreateCycle(dragged,db)){nestTarget=db;if(nestHoverStart==0||nestTarget!=db){nestHoverStart=System.currentTimeMillis();nestingReady=false;}else if(System.currentTimeMillis()-nestHoverStart>NEST_HOVER_DELAY)nestingReady=true;return;}}}nestHoverStart=0;nestingReady=false;}
-    private void handleDrop(){if(swapTarget!=null&&draggingBlock!=null){swapChildren(draggingBlock,swapTarget);}else if(nestTarget!=null&&nestingReady&&draggingBlock!=null){nestBlock(draggingBlock.id,nestTarget.id);}else if(draggingBlock!=null&&draggingBlock.model.getParentId()!=null){invalidate();}nestTarget=null;swapTarget=null;nestingReady=false;}
+    private void resetState(){
+        isDraggingBlock=false;
+        isDraggingConnection=false;
+        isPanning=false;
+        draggingBlock=null;
+        connectionSource=null;
+        dragStartPort=null;
+        tempLineStart=null;
+        tempLineEnd=null;
+        nestTarget=null;
+        swapTarget=null;
+        nestingReady=false;
+    }
 
-    private DrawableBlock findBlockAt(float x,float y){List<DrawableBlock> rev=new ArrayList<>(blocks.values());Collections.reverse(rev);for(DrawableBlock db:rev){if(x>=db.x&&x<=db.x+getBlockWidth(db)&&y>=db.y&&y<=db.y+getBlockHeight(db))return db;}return null;}
-    private PortHit findPortAt(float x,float y){for(DrawableBlock db:blocks.values()){float w=getBlockWidth(db),h=getBlockHeight(db);if(Math.hypot(x-db.x,y-(db.y+h/2))<=PORT_RADIUS*2.5f)return new PortHit(db,"input");if(Math.hypot(x-(db.x+w),y-(db.y+h/2))<=PORT_RADIUS*2.5f)return new PortHit(db,"output");}return null;}
-    private PointF getPortPos(DrawableBlock db,String port){return "input".equals(port)?new PointF(db.x,db.y+getBlockHeight(db)/2):new PointF(db.x+getBlockWidth(db),db.y+getBlockHeight(db)/2);}
-    private boolean isCollapseBtn(float wx,float wy,DrawableBlock db){float cx=db.x+getBlockWidth(db)-16,cy=db.y+10;return Math.hypot(wx-cx,wy-cy)<=12&&!db.model.getChildrenIds().isEmpty();}
-    private float spacing(MotionEvent e){float x=e.getX(0)-e.getX(1),y=e.getY(0)-e.getY(1);return (float)Math.sqrt(x*x+y*y);}
-    private float getBlockWidth(DrawableBlock db){return db.model.getSize().getOrDefault("width",150.0).floatValue();}
-    private float getBlockHeight(DrawableBlock db){return db.model.getSize().getOrDefault("height",80.0).floatValue();}
-    private float toWorldX(float sx){return (sx-panX)/scaleFactor;}
-    private float toWorldY(float sy){return (sy-panY)/scaleFactor;}
-    private int parseColor(String c){try{return Color.parseColor(c);}catch(Exception e){return 0xFF3498db;}}
-    private int darken(int c){float f=0.8f;return Color.argb(Color.alpha(c),(int)(Color.red(c)*f),(int)(Color.green(c)*f),(int)(Color.blue(c)*f));}
+    private void checkNesting(DrawableBlock dragged, float wx, float wy) {
+        nestTarget = null;
+        swapTarget = null;
+        for (DrawableBlock db : blocks.values()) {
+            if (db == dragged) continue;
 
-    public static class DrawableBlock { public BlockModel model; public int id; public float x,y; public boolean selected; }
-    public static class DrawableConnection { public Connection connection; public String id; public int fromBlockId, toBlockId; public String fromPort, toPort; }
-    private static class PortHit { DrawableBlock block; String port; PortHit(DrawableBlock b,String p){block=b;port=p;} }
+            float w = getBlockWidth(db), h = getBlockHeight(db);
+
+            // SWAP: перестановка детей внутри одного родителя
+            if (dragged.model.getParentId() != null && db.model.getParentId() != null
+                    && dragged.model.getParentId().equals(db.model.getParentId())) {
+                if (wx >= db.x && wx <= db.x + w && wy >= db.y && wy <= db.y + h) {
+                    swapTarget = db;
+                    nestingReady = true;
+                    return;
+                }
+            }
+
+            String branchType = String.valueOf(db.model.getProperties().getOrDefault("_branch_type", ""));
+
+            // Для Case блока - ячейка находится СПРАВА
+            if ("case".equals(branchType)) {
+                float cellX = db.x + w + 10;
+                float cellY = db.y + 8;
+                float cellW = 100;
+                float cellH = h - 16;
+
+                if (wx >= cellX && wx <= cellX + cellW && wy >= cellY && wy <= cellY + cellH) {
+                    if (!wouldCreateCycle(dragged, db)) {
+                        nestTarget = db;
+                        if (nestHoverStart == 0 || nestTarget != db) {
+                            nestHoverStart = System.currentTimeMillis();
+                            nestingReady = false;
+                        } else if (System.currentTimeMillis() - nestHoverStart > NEST_HOVER_DELAY) {
+                            nestingReady = true;
+                        }
+                        return;
+                    }
+                }
+            }
+            // Для обычных контейнеров (List, Dictionary, If, Switch)
+            else if (db.model.isContainerBlock()) {
+                if (wx >= db.x && wx <= db.x + w && wy >= db.y && wy <= db.y + h) {
+                    if (!wouldCreateCycle(dragged, db)) {
+                        nestTarget = db;
+                        if (nestHoverStart == 0 || nestTarget != db) {
+                            nestHoverStart = System.currentTimeMillis();
+                            nestingReady = false;
+                        } else if (System.currentTimeMillis() - nestHoverStart > NEST_HOVER_DELAY) {
+                            nestingReady = true;
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+        nestHoverStart = 0;
+        nestingReady = false;
+    }
+
+    private void handleDrop(){
+        if(swapTarget!=null&&draggingBlock!=null){
+            swapChildren(draggingBlock,swapTarget);
+        } else if(nestTarget!=null&&nestingReady&&draggingBlock!=null){
+            nestBlock(draggingBlock.id,nestTarget.id);
+        } else if(draggingBlock!=null&&draggingBlock.model.getParentId()!=null){
+            invalidate();
+        }
+        nestTarget=null;
+        swapTarget=null;
+        nestingReady=false;
+    }
+
+    private DrawableBlock findBlockAt(float x,float y){
+        List<DrawableBlock> rev=new ArrayList<>(blocks.values());
+        Collections.reverse(rev);
+        for(DrawableBlock db:rev){
+            if(x>=db.x&&x<=db.x+getBlockWidth(db)&&y>=db.y&&y<=db.y+getBlockHeight(db))
+                return db;
+        }
+        return null;
+    }
+
+    private PortHit findPortAt(float x,float y){
+        for(DrawableBlock db:blocks.values()){
+            float w=getBlockWidth(db),h=getBlockHeight(db);
+            if(Math.hypot(x-db.x,y-(db.y+h/2))<=PORT_RADIUS*2.5f)
+                return new PortHit(db,"input");
+            if(Math.hypot(x-(db.x+w),y-(db.y+h/2))<=PORT_RADIUS*2.5f)
+                return new PortHit(db,"output");
+        }
+        return null;
+    }
+
+    private PointF getPortPos(DrawableBlock db,String port){
+        return "input".equals(port)?new PointF(db.x,db.y+getBlockHeight(db)/2):new PointF(db.x+getBlockWidth(db),db.y+getBlockHeight(db)/2);
+    }
+
+    private boolean isCollapseBtn(float wx,float wy,DrawableBlock db){
+        float cx=db.x+getBlockWidth(db)-16,cy=db.y+10;
+        return Math.hypot(wx-cx,wy-cy)<=12&&!db.model.getChildrenIds().isEmpty();
+    }
+
+    private float spacing(MotionEvent e){
+        float x=e.getX(0)-e.getX(1),y=e.getY(0)-e.getY(1);
+        return (float)Math.sqrt(x*x+y*y);
+    }
+
+    private float getBlockWidth(DrawableBlock db){
+        return db.model.getSize().getOrDefault("width",150.0).floatValue();
+    }
+
+    private float getBlockHeight(DrawableBlock db){
+        return db.model.getSize().getOrDefault("height",80.0).floatValue();
+    }
+
+    private float toWorldX(float sx){ return (sx-panX)/scaleFactor; }
+    private float toWorldY(float sy){ return (sy-panY)/scaleFactor; }
+    private int parseColor(String c){
+        try{ return Color.parseColor(c); }
+        catch(Exception e){ return 0xFF3498db; }
+    }
+    private int darken(int c){
+        float f=0.8f;
+        return Color.argb(Color.alpha(c),(int)(Color.red(c)*f),(int)(Color.green(c)*f),(int)(Color.blue(c)*f));
+    }
+
+    public static class DrawableBlock {
+        public BlockModel model;
+        public int id;
+        public float x,y;
+        public boolean selected;
+    }
+
+    public static class DrawableConnection {
+        public String id;
+        public int fromBlockId, toBlockId;
+        public String fromPort, toPort;
+    }
+
+    private static class PortHit {
+        DrawableBlock block;
+        String port;
+        PortHit(DrawableBlock b,String p){block=b;port=p;}
+    }
+
     public interface OnBlockClickListener { void onBlockClick(BlockModel block); }
-    public interface OnCanvasChangeListener { void onBlockMoved(int blockId, float x, float y); void onConnectionCreated(int fromId, String fromPort, int toId, String toPort); void onBlockNested(int childId, int parentId); }
+
+    public interface OnCanvasChangeListener {
+        void onBlockMoved(int blockId, float x, float y);
+        void onConnectionCreated(int fromId, String fromPort, int toId, String toPort);
+        void onBlockNested(int childId, int parentId);
+        void onBlockDelete(int blockId);
+    }
 }
