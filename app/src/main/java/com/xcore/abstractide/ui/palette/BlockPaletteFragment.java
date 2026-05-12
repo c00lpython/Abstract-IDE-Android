@@ -1,6 +1,7 @@
 package com.xcore.abstractide.ui.palette;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,6 +20,8 @@ import java.util.*;
 
 public class BlockPaletteFragment extends Fragment {
 
+    private static final String TAG = "Palette";
+
     private ExpandableListView expandableListView;
     private BlockDefinitionParser parser;
     private final List<CategoryGroup> categories = new ArrayList<>();
@@ -28,7 +31,6 @@ public class BlockPaletteFragment extends Fragment {
     private String currentFilter = "";
     private String currentTab = "new";
 
-    // Типы, которые можно вызывать и автоматически добавлять в CREATED
     private static final Set<String> CALLABLE_TYPES = new HashSet<>(Arrays.asList(
             "Definitions.Function", "Definitions.Class", "Definitions.Variable",
             "DataTypes.Variable", "DataTypes.String", "DataTypes.Integer",
@@ -82,18 +84,30 @@ public class BlockPaletteFragment extends Fragment {
     private void loadBlocks() {
         categories.clear();
         allCategories.clear();
+
         try {
             InputStream is = getContext().getAssets().open("blocks/CodeBlocks.json");
-            String json = new Scanner(is).useDelimiter("\\A").next();
+            byte[] buffer = new byte[is.available()];
+            is.read(buffer);
+            String jsonContent = new String(buffer);
             is.close();
-            parser.parseJson(json, "code");
+
+            parser.parseJson(jsonContent, "code");
+
         } catch (Exception e) {
             Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+            return;
         }
+
         List<BlockDefinition> defs = parser.getAllDefinitions();
+        Toast.makeText(getContext(), "Loaded: " + defs.size() + " blocks", Toast.LENGTH_LONG).show();
+
         Map<String, List<BlockDefinition>> grouped = new LinkedHashMap<>();
-        for (BlockDefinition def : defs)
+        for (BlockDefinition def : defs) {
             grouped.computeIfAbsent(def.className, k -> new ArrayList<>()).add(def);
+        }
+
         for (Map.Entry<String, List<BlockDefinition>> e : grouped.entrySet()) {
             CategoryGroup cg = new CategoryGroup(e.getKey(), e.getValue());
             categories.add(cg);
@@ -180,6 +194,10 @@ public class BlockPaletteFragment extends Fragment {
             expandableListView.expandGroup(i);
     }
 
+    public BlockModel createBlockFromDefinition(BlockDefinition def) {
+        return parser.createBlock(def.fullName, "code");
+    }
+
     private class PaletteAdapter extends BaseExpandableListAdapter {
         @Override public int getGroupCount() { return categories.size(); }
         @Override public int getChildrenCount(int gp) { return categories.get(gp).blocks.size(); }
@@ -209,7 +227,9 @@ public class BlockPaletteFragment extends Fragment {
                 tv.setTextSize(11);
                 tv.setTextColor(0xFFcccccc);
             } else tv = (TextView) cv;
-            tv.setText("⬛ " + categories.get(gp).blocks.get(cp).subclassName);
+            BlockDefinition def = categories.get(gp).blocks.get(cp);
+            String suffix = def.hasDroplist ? " ▼" : "";
+            tv.setText("⬛ " + def.subclassName + suffix);
             tv.setBackgroundColor(0xFF252525);
             return tv;
         }

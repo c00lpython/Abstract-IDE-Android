@@ -140,6 +140,26 @@ public class BlockCanvasView extends View {
         popup.show();
     }
 
+    private void showDropListMenu(DrawableBlock block) {
+        if (block.model == null || !block.model.isDroplistBlock()) return;
+
+        List<String> options = block.model.getDroplistOptions();
+        if (options == null || options.isEmpty()) return;
+
+        android.widget.PopupMenu popup = new android.widget.PopupMenu(getContext(), this);
+        for (String option : options) {
+            popup.getMenu().add(option);
+        }
+        popup.setOnMenuItemClickListener(item -> {
+            String selected = item.getTitle().toString();
+            block.model.setDroplistSelected(selected);
+            block.model.getProperties().put("_droplist_selected", selected);
+            invalidate();
+            return true;
+        });
+        popup.show();
+    }
+
     private DrawableConnection findConnectionAt(float x, float y) {
         for (DrawableConnection dc : connections.values()) {
             DrawableBlock from = blocks.get(dc.fromBlockId);
@@ -328,12 +348,9 @@ public class BlockCanvasView extends View {
         cb.getSize().put("height", 80.0);
         cb.setParentId(switchBlock.id);
         cb.getProperties().put("_branch_type", "case");
-
-        // Добавляем свойства контейнера для Case
         cb.getProperties().put("_is_container", true);
         cb.getProperties().put("_container_config", new HashMap<>());
         cb.getProperties().put("_container_items", new ArrayList<>());
-
         cb.initTransients();
         addBlock(cb);
         switchBlock.model.getChildrenIds().add(caseId);
@@ -359,7 +376,6 @@ public class BlockCanvasView extends View {
                 drawBlock(canvas, db);
         }
 
-        // Рисуем линии от Switch к Case веткам
         for(DrawableBlock db:blocks.values()) {
             if (db.model.isContainerBlock() && ("switch".equals(db.model.getContainerType()) || "ControlFlow.Switch".equals(db.model.getType().getFullName()))) {
                 float w = getBlockWidth(db);
@@ -434,17 +450,55 @@ public class BlockCanvasView extends View {
         String type = db.model.getType() != null ? db.model.getType().getSubclassName() : "";
         if (!type.isEmpty()) canvas.drawText(type, db.x + 10, db.y + HEADER_HEIGHT + 16, smallTextPaint);
 
+        // ========== DROPLIST ОТРИСОВКА ==========
+        if (db.model.isDroplistBlock() && db.model.getDroplistOptions() != null && !db.model.getDroplistOptions().isEmpty()) {
+            String selected = db.model.getDroplistSelected();
+            if (selected == null && !db.model.getDroplistOptions().isEmpty()) {
+                selected = db.model.getDroplistOptions().get(0);
+            }
+
+            float dropX = db.x + w - 85;
+            float dropY = db.y + HEADER_HEIGHT + 5;
+            float dropW = 75;
+            float dropH = 22;
+
+            db.dropListRect = new RectF(dropX, dropY, dropX + dropW, dropY + dropH);
+
+            buttonPaint.setColor(0xFF2c3e50);
+            buttonPaint.setStyle(Paint.Style.FILL);
+            canvas.drawRoundRect(db.dropListRect, 4, 4, buttonPaint);
+
+            buttonPaint.setColor(0xFF555555);
+            buttonPaint.setStyle(Paint.Style.STROKE);
+            buttonPaint.setStrokeWidth(1);
+            canvas.drawRoundRect(db.dropListRect, 4, 4, buttonPaint);
+
+            smallTextPaint.setColor(0xFFecf0f1);
+            smallTextPaint.setTextSize(10f * getResources().getDisplayMetrics().density);
+            String displayText = selected.length() > 8 ? selected.substring(0, 6) + ".." : selected;
+            canvas.drawText(displayText, dropX + 6, dropY + 15, smallTextPaint);
+
+            float arrowX = dropX + dropW - 12;
+            float arrowY = dropY + dropH / 2;
+            Path arrow = new Path();
+            arrow.moveTo(arrowX - 4, arrowY - 3);
+            arrow.lineTo(arrowX + 4, arrowY - 3);
+            arrow.lineTo(arrowX, arrowY + 3);
+            arrow.close();
+            buttonPaint.setColor(0xFF95a5a6);
+            buttonPaint.setStyle(Paint.Style.FILL);
+            canvas.drawPath(arrow, buttonPaint);
+
+            smallTextPaint.setTextSize(9f * getResources().getDisplayMetrics().density);
+        }
+
         String branchType = String.valueOf(db.model.getProperties().getOrDefault("_branch_type", ""));
 
-        // Порты: входной красный для всех, кроме True/False; выходной зеленый только для не-Case
-        if (!"true".equals(branchType) && !"false".equals(branchType)) {
+        if (!"true".equals(branchType) && !"false".equals(branchType) && !"case".equals(branchType)) {
             portPaint.setColor(PORT_INPUT_COLOR);
             canvas.drawCircle(db.x, db.y + h/2, PORT_RADIUS, portPaint);
-
-            if (!"case".equals(branchType)) {
-                portPaint.setColor(PORT_OUTPUT_COLOR);
-                canvas.drawCircle(db.x + w, db.y + h/2, PORT_RADIUS, portPaint);
-            }
+            portPaint.setColor(PORT_OUTPUT_COLOR);
+            canvas.drawCircle(db.x + w, db.y + h/2, PORT_RADIUS, portPaint);
         }
 
         if (db.model.isContainerBlock()) {
@@ -456,13 +510,11 @@ public class BlockCanvasView extends View {
             String ct = db.model.getContainerType();
             int cc = db.model.getChildrenIds().size();
 
-            // Case блок - ячейка СПРАВА (как у List)
             if ("case".equals(branchType)) {
                 float cellW = 100, cellH = h - 16;
                 float cellX = db.x + w + 10, cellY = db.y + 8;
                 RectF cell = new RectF(cellX, cellY, cellX + cellW, cellY + cellH);
 
-                // Рисуем ячейку
                 cellPaint.setColor(0x18000000);
                 cellPaint.setStyle(Paint.Style.FILL);
                 canvas.drawRoundRect(cell, 8, 8, cellPaint);
@@ -470,7 +522,6 @@ public class BlockCanvasView extends View {
                 cellPaint.setStyle(Paint.Style.STROKE);
                 canvas.drawRoundRect(cell, 8, 8, cellPaint);
 
-                // Рисуем вложенные блоки в ячейке
                 float childY = cellY + 5;
                 for (int cid : db.model.getChildrenIds()) {
                     DrawableBlock child = blocks.get(cid);
@@ -491,7 +542,6 @@ public class BlockCanvasView extends View {
                     canvas.drawText("Drop value here", cellX + 10, cellY + cellH / 2 + 5, smallTextPaint);
                 }
             }
-            // Dictionary
             else if ("dictionary".equals(ct)) {
                 float cellH=24,cellPadding=8; float startX=db.x+w+10; float startY=db.y+8; int pairCount=Math.max(1,(cc+1)/2);
                 float maxKeyW=60,maxValW=60;
@@ -548,7 +598,6 @@ public class BlockCanvasView extends View {
                     }
                 }
             }
-            // List / Array
             else if ("list".equals(ct) || "array".equals(ct)) {
                 float cw=100,ch2=h-16; int tc=Math.max(1,cc+1);
                 for(int i=0;i<tc;i++){
@@ -580,7 +629,6 @@ public class BlockCanvasView extends View {
                     }
                 }
             }
-            // If
             else if ("if".equals(ct) || "ControlFlow.If".equals(db.model.getType().getFullName())) {
                 float condW=180,condH=h-16;
                 RectF condCell=new RectF(db.x+w+10,db.y+8,db.x+w+10+condW,db.y+8+condH);
@@ -601,7 +649,6 @@ public class BlockCanvasView extends View {
                     }
                 }
             }
-            // Switch
             else if ("switch".equals(ct) || "ControlFlow.Switch".equals(db.model.getType().getFullName())) {
                 float btnX = db.x + w - 30, btnY = db.y + 6;
                 buttonPaint.setColor(0xFFf39c12);
@@ -620,7 +667,6 @@ public class BlockCanvasView extends View {
                 smallTextPaint.setColor(0xFFf39c12);
                 canvas.drawText("Expression", db.x + w + 30, db.y + exprH / 2 + 12, smallTextPaint);
             }
-            // Function / Method
             else if ("function".equals(ct) || "method".equals(ct)) {
                 float cw=120,ch2=h-16;
                 RectF pc=new RectF(db.x+w+10,db.y+8,db.x+w+10+cw,db.y+8+ch2);
@@ -632,7 +678,6 @@ public class BlockCanvasView extends View {
                 cellPaint.setColor(CELL_BORDER_COLOR);cellPaint.setStyle(Paint.Style.STROKE);canvas.drawRoundRect(bc,8,8,cellPaint);cellPaint.setStyle(Paint.Style.FILL);
                 smallTextPaint.setColor(0xFFffffff);canvas.drawText("Body",db.x+w+cw+30,db.y+ch2/2+8,smallTextPaint);
             }
-            // Другие контейнеры
             else {
                 float cw=100,ch2=h-16; int tc=Math.max(1,cc+1);
                 for(int i=0;i<tc;i++){
@@ -666,7 +711,6 @@ public class BlockCanvasView extends View {
             }
         }
 
-        // Дочерние блоки (не контейнеры)
         if (!db.model.getChildrenIds().isEmpty() && !db.model.isContainerBlock()) {
             float cy=db.y+h+8,cx=db.x+CHILD_INDENT;int idx=0;
             for(int cid:db.model.getChildrenIds()){
@@ -789,6 +833,12 @@ public class BlockCanvasView extends View {
                 }
                 DrawableBlock hit=findBlockAt(wx,wy);
                 if(hit!=null){
+                    // Проверка клика по выпадающему списку
+                    if (hit.dropListRect != null && hit.dropListRect.contains(wx, wy)) {
+                        showDropListMenu(hit);
+                        return true;
+                    }
+
                     if ("switch".equals(hit.model.getContainerType()) || "ControlFlow.Switch".equals(hit.model.getType().getFullName())) {
                         float btnX = hit.x + getBlockWidth(hit) - 30, btnY = hit.y + 6;
                         if (Math.hypot(wx - btnX, wy - btnY) <= 14) {
@@ -902,7 +952,6 @@ public class BlockCanvasView extends View {
 
             float w = getBlockWidth(db), h = getBlockHeight(db);
 
-            // SWAP: перестановка детей внутри одного родителя
             if (dragged.model.getParentId() != null && db.model.getParentId() != null
                     && dragged.model.getParentId().equals(db.model.getParentId())) {
                 if (wx >= db.x && wx <= db.x + w && wy >= db.y && wy <= db.y + h) {
@@ -914,7 +963,6 @@ public class BlockCanvasView extends View {
 
             String branchType = String.valueOf(db.model.getProperties().getOrDefault("_branch_type", ""));
 
-            // Для Case блока - ячейка находится СПРАВА
             if ("case".equals(branchType)) {
                 float cellX = db.x + w + 10;
                 float cellY = db.y + 8;
@@ -934,7 +982,6 @@ public class BlockCanvasView extends View {
                     }
                 }
             }
-            // Для обычных контейнеров (List, Dictionary, If, Switch)
             else if (db.model.isContainerBlock()) {
                 if (wx >= db.x && wx <= db.x + w && wy >= db.y && wy <= db.y + h) {
                     if (!wouldCreateCycle(dragged, db)) {
@@ -1024,8 +1071,9 @@ public class BlockCanvasView extends View {
     public static class DrawableBlock {
         public BlockModel model;
         public int id;
-        public float x,y;
+        public float x, y;
         public boolean selected;
+        public RectF dropListRect;
     }
 
     public static class DrawableConnection {

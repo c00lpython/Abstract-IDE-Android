@@ -12,6 +12,7 @@ import com.xcore.abstractide.core.project.ProjectManager;
 import com.xcore.abstractide.ui.canvas.BlockCanvasView;
 import com.xcore.abstractide.ui.explorer.ProjectExplorerFragment;
 import com.xcore.abstractide.ui.palette.BlockPaletteFragment;
+import com.xcore.abstractide.core.parser.BlockDefinitionParser.BlockDefinition;
 import com.xcore.abstractide.ui.property.PropertyEditorDialog;
 
 import java.util.UUID;
@@ -44,7 +45,6 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btnBuild).setOnClickListener(v -> { CodeBuilder b = new CodeBuilder(); tvTerminal.setText("=== Build ===\n" + b.build(currentProject)); });
         findViewById(R.id.btnRun).setOnClickListener(v -> { CodeBuilder b = new CodeBuilder(); tvTerminal.setText("=== Run ===\n" + b.build(currentProject)); });
 
-        // Font scaling
         findViewById(R.id.btnFontPlus).setOnClickListener(v -> {
             terminalFontSize += 2f;
             tvTerminal.setTextSize(terminalFontSize);
@@ -58,9 +58,17 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btnEditProperties).setOnClickListener(v -> {
             for (BlockModel blk : currentProject.getAllBlocks()) {
                 BlockCanvasView.DrawableBlock db = canvasView.getDrawableBlock(blk.getId());
-                if (db != null && db.selected) { PropertyEditorDialog.show(MainActivity.this, blk, currentProject, ub -> { showProperties(ub); canvasView.invalidate(); explorerFragment.setProject(currentProject); }); break; }
+                if (db != null && db.selected) {
+                    PropertyEditorDialog.show(MainActivity.this, blk, currentProject, ub -> {
+                        showProperties(ub);
+                        canvasView.invalidate();
+                        explorerFragment.setProject(currentProject);
+                    });
+                    break;
+                }
             }
         });
+
         findViewById(R.id.menuFile).setOnClickListener(v -> showFileMenu());
         findViewById(R.id.menuEdit).setOnClickListener(v -> tvTerminal.append("\nEdit"));
         findViewById(R.id.menuView).setOnClickListener(v -> tvTerminal.append("\nView"));
@@ -75,48 +83,77 @@ public class MainActivity extends AppCompatActivity {
                     BlockModel blk = currentProject.getBlock(blockId);
                     if (blk != null) showProperties(blk);
                 }
-                @Override public void onBlockRename(int blockId, String nn) { BlockModel blk = currentProject.getBlock(blockId); if (blk != null) { blk.setName(nn); blk.touch(); } canvasView.invalidate(); explorerFragment.setProject(currentProject); }
-                @Override public void onBlockDelete(int blockId) { canvasView.removeBlock(blockId); explorerFragment.setProject(currentProject); }
+                @Override public void onBlockRename(int blockId, String nn) {
+                    BlockModel blk = currentProject.getBlock(blockId);
+                    if (blk != null) {
+                        blk.setName(nn);
+                        blk.touch();
+                    }
+                    canvasView.invalidate();
+                    explorerFragment.setProject(currentProject);
+                }
+                @Override public void onBlockDelete(int blockId) {
+                    canvasView.removeBlock(blockId);
+                    explorerFragment.setProject(currentProject);
+                }
             });
         }
 
         paletteFragment = (BlockPaletteFragment) getSupportFragmentManager().findFragmentById(R.id.fragmentPalette);
         if (paletteFragment != null) {
             paletteFragment.setOnBlockSelectedListener(def -> {
-                BlockModel blk = new BlockModel();
-                blk.setId(currentProject.getIdManager().getNextId());
-                blk.setType(new BlockModel.BlockType("code", def.className, def.subclassName));
-                blk.setName(def.subclassName);
-                blk.setColor(def.color != null ? def.color : "#3498db");
+                BlockModel blk = paletteFragment.createBlockFromDefinition(def);
+                if (blk == null) {
+                    blk = new BlockModel();
+                    blk.setId(currentProject.getIdManager().getNextId());
+                    blk.setType(new BlockModel.BlockType("code", def.className, def.subclassName));
+                    blk.setName(def.subclassName);
+                    blk.setColor(def.color != null ? def.color : "#3498db");
+                } else {
+                    blk.setId(currentProject.getIdManager().getNextId());
+                }
+
                 float[] c = canvasView.getViewCenter();
-                blk.getPosition().put("x", (double)c[0]); blk.getPosition().put("y", (double)c[1]);
+                blk.getPosition().put("x", (double)c[0]);
+                blk.getPosition().put("y", (double)c[1]);
+
                 if (BlockCanvasView.isContainerType(blk.getType())) {
                     blk.getProperties().put("_is_container", true);
                     blk.getProperties().put("_container_config", def.containerConfig != null ? def.containerConfig : new java.util.HashMap<>());
                     blk.getProperties().put("_container_items", new java.util.ArrayList<>());
                     blk.initTransients();
                 }
-                currentProject.addBlock(blk); canvasView.addBlock(blk);
+
+                currentProject.addBlock(blk);
+                canvasView.addBlock(blk);
+
                 if ("If".equals(def.subclassName) || "ControlFlow.If".equals(def.fullName)) {
                     BlockCanvasView.DrawableBlock ifBlock = canvasView.getDrawableBlock(blk.getId());
                     if (ifBlock != null) canvasView.createBranchBlocks(ifBlock);
                 }
+
                 paletteFragment.autoAddToCreated(blk);
-                tvTerminal.append("\n+ " + def.subclassName + " container=" + blk.isContainerBlock());
+                tvTerminal.append("\n+ " + def.subclassName + " container=" + blk.isContainerBlock() +
+                        " droplist=" + blk.isDroplistBlock());
                 explorerFragment.setProject(currentProject);
             });
         }
 
         SearchView sp = findViewById(R.id.searchPalette);
-        if (sp != null && paletteFragment != null) sp.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override public boolean onQueryTextSubmit(String q) { return false; }
-            @Override public boolean onQueryTextChange(String t) { paletteFragment.filter(t); return true; }
-        });
+        if (sp != null && paletteFragment != null) {
+            sp.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                @Override public boolean onQueryTextSubmit(String q) { return false; }
+                @Override public boolean onQueryTextChange(String t) { paletteFragment.filter(t); return true; }
+            });
+        }
 
-        findViewById(R.id.tabNew).setOnClickListener(v -> paletteFragment.showCategory("code"));
+        findViewById(R.id.tabNew).setOnClickListener(v -> paletteFragment.showCategory("new"));
         findViewById(R.id.tabCreated).setOnClickListener(v -> paletteFragment.showCategory("created"));
 
-        canvasView.setOnBlockClickListener(blk -> { tvTerminal.append("\nSelected: " + blk.getName()); showProperties(blk); });
+        canvasView.setOnBlockClickListener(blk -> {
+            tvTerminal.append("\nSelected: " + blk.getName());
+            showProperties(blk);
+        });
 
         canvasView.setOnCanvasChangeListener(new BlockCanvasView.OnCanvasChangeListener() {
             @Override
@@ -154,8 +191,6 @@ public class MainActivity extends AppCompatActivity {
                     tvTerminal.append("\n🗑️ Deleted block: " + blockId);
                 }
             }
-
-
         });
 
         addDemoBlock();
@@ -169,6 +204,10 @@ public class MainActivity extends AppCompatActivity {
         sb.append("Size: ").append(blk.getSize().get("width")).append("x").append(blk.getSize().get("height")).append("\n");
         if (blk.isContainerBlock()) sb.append("Container: ").append(blk.getContainerType()).append("\nItems: ").append(blk.getContainerItems().size()).append("\n");
         sb.append("Children: ").append(blk.getChildrenIds().size()).append("\n");
+        if (blk.isDroplistBlock()) {
+            sb.append("DropList: ").append(blk.getDroplistSelected()).append("\n");
+            sb.append("Options: ").append(blk.getDroplistOptions()).append("\n");
+        }
         tvProperties.setText(sb.toString());
     }
 
@@ -176,29 +215,44 @@ public class MainActivity extends AppCompatActivity {
         BlockModel container = new BlockModel();
         container.setId(currentProject.getIdManager().getNextId());
         container.setType(new BlockModel.BlockType("code", "ControlFlow", "If"));
-        container.setName("If Block"); container.setColor("#8e44ad");
-        container.getPosition().put("x", 100.0); container.getPosition().put("y", 100.0);
+        container.setName("If Block");
+        container.setColor("#8e44ad");
+        container.getPosition().put("x", 100.0);
+        container.getPosition().put("y", 100.0);
         container.getProperties().put("_is_container", true);
         container.getProperties().put("_container_config", new java.util.HashMap<>());
         container.getProperties().put("_container_items", new java.util.ArrayList<>());
         container.initTransients();
-        currentProject.addBlock(container); canvasView.addBlock(container);
+        currentProject.addBlock(container);
+        canvasView.addBlock(container);
 
         BlockModel blk = new BlockModel();
         blk.setId(currentProject.getIdManager().getNextId());
         blk.setType(new BlockModel.BlockType("code", "Builtins", "Print"));
-        blk.setName("Drag Me"); blk.setColor("#e74c3c");
-        blk.getPosition().put("x", 300.0); blk.getPosition().put("y", 300.0);
-        currentProject.addBlock(blk); canvasView.addBlock(blk);
+        blk.setName("Drag Me");
+        blk.setColor("#e74c3c");
+        blk.getPosition().put("x", 300.0);
+        blk.getPosition().put("y", 300.0);
+        currentProject.addBlock(blk);
+        canvasView.addBlock(blk);
+
         tvTerminal.setText("Ready.\nContainer: If Block\nDraggable: Drag Me");
     }
 
     private void showFileMenu() {
         PopupMenu popup = new PopupMenu(this, findViewById(R.id.menuFile));
-        popup.getMenu().add("New Project"); popup.getMenu().add("Save"); popup.getMenu().add("Open...");
+        popup.getMenu().add("New Project");
+        popup.getMenu().add("Save");
+        popup.getMenu().add("Open...");
         popup.setOnMenuItemClickListener(item -> {
-            if (item.getTitle().toString().contains("Save")) { projectManager.saveProject(currentProject); tvTerminal.append("\nSaved!"); }
-            else if (item.getTitle().toString().contains("New")) { currentProject = projectManager.newProject("New Project"); canvasView.clearBlocks(); tvTerminal.setText("New project created"); }
+            if (item.getTitle().toString().contains("Save")) {
+                projectManager.saveProject(currentProject);
+                tvTerminal.append("\nSaved!");
+            } else if (item.getTitle().toString().contains("New")) {
+                currentProject = projectManager.newProject("New Project");
+                canvasView.clearBlocks();
+                tvTerminal.setText("New project created");
+            }
             return true;
         });
         popup.show();

@@ -1,11 +1,11 @@
+# Abstract IDE
+
 <p align="center">
   <img src="app/src/main/res/drawable/abstract_logo.png" width="128" alt="Abstract IDE Logo">
 </p>
 
-<h1 align="center">Abstract IDE</h1>
-
 <p align="center">
-  <b>Визуальная среда программирования, где код собирается как конструктор.</b>
+  <b>Visual programming environment where you build code like Lego bricks</b>
 </p>
 
 <p align="center">
@@ -17,38 +17,20 @@
 
 ---
 
-## 🔥 Почему Abstract IDE?
+## 📖 Documentation
 
-Представь себе **Scratch**, но с безграничными возможностями. Ты можешь не просто учиться программировать, а создавать полноценные программы с поддержкой плагинов, вложенными контейнерами и умной системой связей между блоками.
+- [🇬🇧 English](docs/README.en.md)
+- [🇷🇺 Русский](docs/README.ru.md)
 
-Вот что превращает этот проект из простого "конструктора" в инструмент для настоящего разработчика:
+---
 
-### 🤖 Технические фишки для профессионалов
+## 🚀 Quick Links
 
-*   **Графовая архитектура**: Все блоки хранятся как граф с направленными связями (`FROM port -> TO port`), а последовательность выполнения вычисляется через топологическую сортировку (алгоритм DFS). Ты видишь не просто список, а логику программы.
-*   **Умные контейнеры**: Блоки сами знают, кто их "родитель" и "дети". Контейнеры (`if/else`, `for`) динамически меняют свой размер, чтобы вместить вложенные блоки. **Nesting** (вложение) происходит с анимацией и защитой от циклических связей.
-*   **Система Call-блоков**: Внутри контейнеров (как списки или словари) создаются специальные `call_` блоки. Они хранят ссылку на оригинальный блок, что позволяет вызывать переменные и функции без дублирования кода.
-*   **Сериализация в JSON**: Проект сохраняется в единый `.abstract` файл. Это JSON с полным графом, который легко читать, изменять вручную или использовать для систем контроля версий (Git).
+- [Download APK](https://github.com/c00lpython/Abstract-IDE-Android/releases)
+- [Report a Bug](https://github.com/c00lpython/Abstract-IDE-Android/issues)
 
-### ⚙️ Архитектура (Граф)
+---
 
-Эта схема показывает, как блоки связаны друг с другом и как они вложены. Это и есть сердце программы.
+## 📄 License
 
-```mermaid
-graph TD
-    A[Variable x = 5] --> B[Print]
-    C[List Container] -...-> D[call_Variable]
-    A -...-> C
-    
-    E[If Block]
-    E1[Condition Container]
-    E --- E1
-    
-    E1 --> G[Operator ==]
-    E1 --> H[Value 10]
-    E1 --> I[Variable x]
-    
-    E --> J[True Branch]
-    E --> K[False Branch]
-    J -...-> L[Print Yes]
-    K -...-> M[Print No]
+This project is licensed under the MIT License.

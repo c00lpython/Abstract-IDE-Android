@@ -1,5 +1,6 @@
 package com.xcore.abstractide.core.parser;
 
+import android.util.Log;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.xcore.abstractide.core.model.BlockModel;
@@ -9,10 +10,6 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.util.*;
 
-/**
- * Аналог: json_parser.py + BlockFactory._load_definitions()
- * Загружает определения блоков из CodeBlocks.json и GUIBlocks.json
- */
 public class BlockDefinitionParser {
 
     private final Map<String, Map<String, BlockDefinition>> definitions = new LinkedHashMap<>();
@@ -21,32 +18,39 @@ public class BlockDefinitionParser {
     public BlockDefinitionParser() {
         definitions.put("code", new LinkedHashMap<>());
         definitions.put("gui", new LinkedHashMap<>());
-        loadCodeBlocks();
     }
 
-    /**
-     * Загрузить CodeBlocks.json из assets
-     */
-    private void loadCodeBlocks() {
+    public void loadCodeBlocks(InputStream inputStream) {
         try {
-            // TODO: загрузить из assets/blocks/CodeBlocks.json
-            // Пока используем хардкод-заглушку
-            parseJson("{}", "code");
+            InputStreamReader reader = new InputStreamReader(inputStream);
+            Type type = new TypeToken<Map<String, Object>>(){}.getType();
+            Map<String, Object> root = gson.fromJson(reader, type);
+            parseJson(root, "code");
+            Log.d("Parser", "Loaded code blocks successfully");
         } catch (Exception e) {
-            System.err.println("Error loading CodeBlocks.json: " + e.getMessage());
+            Log.e("Parser", "Error loading CodeBlocks.json: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    /**
-     * Распарсить JSON и добавить определения
-     */
-    @SuppressWarnings("unchecked")
-    public void parseJson(String json, String category) {
-        Type type = new TypeToken<Map<String, Object>>(){}.getType();
-        Map<String, Object> root = gson.fromJson(json, type);
+    // ✅ НОВЫЙ МЕТОД: парсинг из строки
+    public void parseJson(String jsonString, String category) {
+        try {
+            Type type = new TypeToken<Map<String, Object>>(){}.getType();
+            Map<String, Object> root = gson.fromJson(jsonString, type);
+            parseJson(root, category);
+        } catch (Exception e) {
+            Log.e("Parser", "Error parsing JSON string: " + e.getMessage());
+        }
+    }
 
+    @SuppressWarnings("unchecked")
+    public void parseJson(Map<String, Object> root, String category) {
         Map<String, Object> blockClasses = (Map<String, Object>) root.get("block_classes");
-        if (blockClasses == null) return;
+        if (blockClasses == null) {
+            Log.e("Parser", "No block_classes found in JSON");
+            return;
+        }
 
         for (Map.Entry<String, Object> classEntry : blockClasses.entrySet()) {
             String className = classEntry.getKey();
@@ -97,25 +101,23 @@ public class BlockDefinitionParser {
                     def.hasDroplist = true;
                     def.droplistOptions = (List<String>) droplist.get("options");
                     def.droplistDefault = String.valueOf(droplist.getOrDefault("default", ""));
+                    Log.d("Parser", "✅ Loaded droplist for " + fullName +
+                            ": options=" + def.droplistOptions +
+                            ", default=" + def.droplistDefault);
                 }
 
                 definitions.get(category).put(fullName, def);
             }
         }
+        Log.d("Parser", "Total definitions loaded: " + definitions.get(category).size());
     }
 
-    /**
-     * Получить определение блока
-     */
     public BlockDefinition getDefinition(String fullName, String category) {
         Map<String, BlockDefinition> catDefs = definitions.get(category);
         if (catDefs == null) catDefs = definitions.get("code");
         return catDefs != null ? catDefs.get(fullName) : null;
     }
 
-    /**
-     * Получить все определения
-     */
     public List<BlockDefinition> getAllDefinitions(String category) {
         Map<String, BlockDefinition> catDefs = definitions.get(category);
         if (catDefs == null) catDefs = definitions.get("code");
@@ -123,9 +125,6 @@ public class BlockDefinitionParser {
         return new ArrayList<>(catDefs.values());
     }
 
-    /**
-     * Получить все определения (code + gui)
-     */
     public List<BlockDefinition> getAllDefinitions() {
         List<BlockDefinition> all = new ArrayList<>();
         for (Map<String, BlockDefinition> catDefs : definitions.values()) {
@@ -134,26 +133,24 @@ public class BlockDefinitionParser {
         return all;
     }
 
-    /**
-     * Создать блок по определению
-     */
     public BlockModel createBlock(String fullName, String category) {
         BlockDefinition def = getDefinition(fullName, category);
-        if (def == null) return null;
+        if (def == null) {
+            Log.e("Parser", "No definition found for " + fullName);
+            return null;
+        }
 
         BlockModel block = new BlockModel();
         block.setType(new BlockModel.BlockType(category, def.className, def.subclassName));
         block.setName(def.subclassName);
         block.setColor(def.color != null ? def.color : "#3498db");
 
-        // Установить свойства по умолчанию
         for (BlockProperty prop : def.properties.values()) {
             if (prop.defaultValue != null) {
                 block.getProperties().put(prop.name, prop.defaultValue);
             }
         }
 
-        // Настроить контейнер
         if (def.isContainer) {
             block.getProperties().put("_is_container", true);
             if (def.containerConfig != null) {
@@ -162,20 +159,17 @@ public class BlockDefinitionParser {
             block.getProperties().put("_container_items", new ArrayList<>());
         }
 
-        // Настроить droplist
         if (def.hasDroplist) {
             block.getProperties().put("_is_droplist", true);
             block.getProperties().put("_droplist_options", def.droplistOptions);
-            block.getProperties().put("_droplist_selected", def.droplistDefault != null ?
-                    def.droplistDefault : (def.droplistOptions != null && !def.droplistOptions.isEmpty() ?
-                    def.droplistOptions.get(0) : ""));
+            String defaultVal = def.droplistDefault != null ? def.droplistDefault :
+                    (def.droplistOptions != null && !def.droplistOptions.isEmpty() ? def.droplistOptions.get(0) : "");
+            block.getProperties().put("_droplist_selected", defaultVal);
         }
 
         block.initTransients();
         return block;
     }
-
-    // ========== ВЛОЖЕННЫЕ КЛАССЫ ==========
 
     public static class BlockDefinition {
         public String fullName;

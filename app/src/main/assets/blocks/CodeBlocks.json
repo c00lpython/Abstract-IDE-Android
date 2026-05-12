@@ -224,7 +224,7 @@
       "subclasses": {
         "If": {
           "description": "Условный оператор",
-          "color": "#8e44ad",
+          "color": "#e74c3c",
           "type": "control",
           "is_container": true,
           "container_config": {
@@ -317,6 +317,25 @@
           },
           "properties": {
             "value": {"type": "any", "description": "Выражение для сравнения", "required": true}
+          }
+        },
+        "Case": {
+          "description": "Вариант для switch",
+          "color": "#2ecc71",
+          "type": "control",
+          "is_container": true,
+          "container_config": {
+            "orientation": "horizontal",
+            "item_width": 140,
+            "item_height": 50,
+            "spacing": 5,
+            "max_items": 50,
+            "accepts_types": ["statement"],
+            "container_type": "case"
+          },
+          "properties": {
+            "pattern": {"type": "any", "description": "Значение для сравнения", "required": true},
+            "is_default": {"type": "boolean", "description": "Вариант по умолчанию", "default": false}
           }
         }
       }
