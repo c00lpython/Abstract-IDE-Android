@@ -23,6 +23,7 @@ public class BlockCanvasView extends View {
     private static final float ZOOM_MAX = 5.0f;
     private static final long ANIM_DURATION = 300;
     private static final long DOUBLE_CLICK_INTERVAL = 300;
+    private static final float SNAP_DISTANCE = 40f;
     private static final int PORT_INPUT_COLOR = 0xFFe74c3c;
     private static final int PORT_OUTPUT_COLOR = 0xFF2ecc71;
     private static final int CONNECTION_COLOR = 0xFF3498db;
@@ -64,6 +65,12 @@ public class BlockCanvasView extends View {
     private long nestHoverStart;
     private boolean nestingReady;
 
+    // Snapping поля
+    private DrawableBlock snapSource;
+    private DrawableBlock snapTarget;
+    private String snapDirection;
+    private boolean isSnapping;
+
     private long lastClickTime;
     private DrawableBlock contextMenuBlock;
     private float contextMenuX, contextMenuY;
@@ -71,6 +78,15 @@ public class BlockCanvasView extends View {
     private final RectF contextMenuRect = new RectF();
 
     private final Set<Integer> collapsedBlocks = new HashSet<>();
+
+    // DropDown поля
+    private boolean showDropDown;
+    private DrawableBlock dropDownBlock;
+    private int selectedDropDownIndex;
+    private RectF dropDownRect;
+    private Paint dropDownBgPaint;
+    private Paint dropDownItemPaint;
+    private Paint dropDownTextPaint;
 
     private final Paint blockPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -85,6 +101,7 @@ public class BlockCanvasView extends View {
     private final Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint buttonPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint cellPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint snapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path connectionPath = new Path();
     private final DecelerateInterpolator interpolator = new DecelerateInterpolator();
 
@@ -111,6 +128,19 @@ public class BlockCanvasView extends View {
         selectionPaint.setColor(SELECTION_COLOR); selectionPaint.setStrokeWidth(3f); selectionPaint.setStyle(Paint.Style.STROKE);
         cellPaint.setColor(CELL_COLOR); cellPaint.setStrokeWidth(1f); cellPaint.setStyle(Paint.Style.STROKE);
         portPaint.setStyle(Paint.Style.FILL);
+        snapPaint.setColor(0xAA2ecc71);
+        snapPaint.setStyle(Paint.Style.STROKE);
+        snapPaint.setStrokeWidth(4);
+
+        // DropDown paints
+        dropDownBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dropDownBgPaint.setColor(0xEE2d2d2d);
+        dropDownItemPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dropDownItemPaint.setColor(0xFF3a3a3a);
+        dropDownTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dropDownTextPaint.setColor(0xFFecf0f1);
+        dropDownTextPaint.setTextSize(12f * d);
+
         setFocusable(true); setFocusableInTouchMode(true);
 
         gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
@@ -140,24 +170,96 @@ public class BlockCanvasView extends View {
         popup.show();
     }
 
-    private void showDropListMenu(DrawableBlock block) {
+    private void showDropDownMenu(DrawableBlock block) {
         if (block.model == null || !block.model.isDroplistBlock()) return;
 
         List<String> options = block.model.getDroplistOptions();
         if (options == null || options.isEmpty()) return;
 
-        android.widget.PopupMenu popup = new android.widget.PopupMenu(getContext(), this);
-        for (String option : options) {
-            popup.getMenu().add(option);
+        showDropDown = true;
+        dropDownBlock = block;
+        selectedDropDownIndex = -1;
+
+        float x = block.dropListRect.left;
+        float y = block.dropListRect.bottom + 5;
+        float w = block.dropListRect.width();
+        float h = options.size() * 30;
+
+        dropDownRect = new RectF(x, y, x + w, y + h);
+
+        float maxY = getHeight() - 100;
+        if (dropDownRect.bottom > maxY) {
+            dropDownRect.offset(0, -(dropDownRect.bottom - maxY) - 10);
         }
-        popup.setOnMenuItemClickListener(item -> {
-            String selected = item.getTitle().toString();
-            block.model.setDroplistSelected(selected);
-            block.model.getProperties().put("_droplist_selected", selected);
-            invalidate();
-            return true;
-        });
-        popup.show();
+
+        invalidate();
+    }
+
+    private void checkSnapping(DrawableBlock dragged) {
+        snapSource = null;
+        snapTarget = null;
+        snapDirection = null;
+        isSnapping = false;
+
+        String branchType = String.valueOf(dragged.model.getProperties().getOrDefault("_branch_type", ""));
+        if ("true".equals(branchType) || "false".equals(branchType) || "case".equals(branchType)) {
+            return;
+        }
+
+        float draggedRight = dragged.x + getBlockWidth(dragged);
+        float draggedLeft = dragged.x;
+        float draggedCenterY = dragged.y + getBlockHeight(dragged) / 2;
+        float draggedTop = dragged.y;
+        float draggedBottom = dragged.y + getBlockHeight(dragged);
+
+        for (DrawableBlock db : blocks.values()) {
+            if (db == dragged) continue;
+
+            String dbBranchType = String.valueOf(db.model.getProperties().getOrDefault("_branch_type", ""));
+            if ("true".equals(dbBranchType) || "false".equals(dbBranchType) || "case".equals(dbBranchType)) {
+                continue;
+            }
+
+            float dbLeft = db.x;
+            float dbRight = db.x + getBlockWidth(db);
+            float dbCenterY = db.y + getBlockHeight(db) / 2;
+            float dbTop = db.y;
+            float dbBottom = db.y + getBlockHeight(db);
+
+            float distX = Math.abs(draggedRight - dbLeft);
+            float distY = Math.abs(draggedCenterY - dbCenterY);
+            boolean yOverlap = (draggedBottom > dbTop && draggedTop < dbBottom);
+
+            // Правый край dragged к левому краю db
+            if (distX < SNAP_DISTANCE && (distY < 50f || yOverlap)) {
+                snapSource = dragged;
+                snapTarget = db;
+                snapDirection = "right_to_left";
+                isSnapping = true;
+
+                float targetX = dbLeft - getBlockWidth(dragged);
+                float targetY = dbCenterY - getBlockHeight(dragged) / 2;
+                dragged.x = targetX;
+                dragged.y = targetY;
+                return;
+            }
+
+            // Левый край dragged к правому краю db
+            distX = Math.abs(draggedLeft - dbRight);
+
+            if (distX < SNAP_DISTANCE && (distY < 50f || yOverlap)) {
+                snapSource = dragged;
+                snapTarget = db;
+                snapDirection = "left_to_right";
+                isSnapping = true;
+
+                float targetX = dbRight;
+                float targetY = dbCenterY - getBlockHeight(dragged) / 2;
+                dragged.x = targetX;
+                dragged.y = targetY;
+                return;
+            }
+        }
     }
 
     private DrawableConnection findConnectionAt(float x, float y) {
@@ -397,6 +499,32 @@ public class BlockCanvasView extends View {
             }
         }
 
+        // Отрисовка выпадающего списка
+        if (showDropDown && dropDownBlock != null && dropDownRect != null) {
+            List<String> options = dropDownBlock.model.getDroplistOptions();
+            if (options != null) {
+                canvas.drawRoundRect(dropDownRect, 8, 8, dropDownBgPaint);
+
+                float itemH = 30;
+                float itemY = dropDownRect.top;
+                for (int i = 0; i < options.size(); i++) {
+                    RectF itemRect = new RectF(dropDownRect.left, itemY, dropDownRect.right, itemY + itemH);
+                    if (i == selectedDropDownIndex) {
+                        canvas.drawRect(itemRect, dropDownItemPaint);
+                    }
+                    dropDownTextPaint.setColor(0xFFecf0f1);
+                    canvas.drawText(options.get(i), itemRect.left + 8, itemRect.centerY() + 5, dropDownTextPaint);
+                    itemY += itemH;
+                }
+
+                dropDownBgPaint.setStyle(Paint.Style.STROKE);
+                dropDownBgPaint.setStrokeWidth(1);
+                dropDownBgPaint.setColor(0xFF555555);
+                canvas.drawRoundRect(dropDownRect, 8, 8, dropDownBgPaint);
+                dropDownBgPaint.setStyle(Paint.Style.FILL);
+            }
+        }
+
         if(showContextMenu&&contextMenuBlock!=null){
             float mx=contextMenuX,my=contextMenuY,mw=200;
             int mh = contextMenuBlock.model.getParentId() != null ? 130 : 90;
@@ -450,7 +578,7 @@ public class BlockCanvasView extends View {
         String type = db.model.getType() != null ? db.model.getType().getSubclassName() : "";
         if (!type.isEmpty()) canvas.drawText(type, db.x + 10, db.y + HEADER_HEIGHT + 16, smallTextPaint);
 
-        // ========== DROPLIST ОТРИСОВКА ==========
+        // Отрисовка выпадающего списка (если у блока есть droplist)
         if (db.model.isDroplistBlock() && db.model.getDroplistOptions() != null && !db.model.getDroplistOptions().isEmpty()) {
             String selected = db.model.getDroplistSelected();
             if (selected == null && !db.model.getDroplistOptions().isEmpty()) {
@@ -490,6 +618,11 @@ public class BlockCanvasView extends View {
             canvas.drawPath(arrow, buttonPaint);
 
             smallTextPaint.setTextSize(9f * getResources().getDisplayMetrics().density);
+        }
+
+        // Подсветка при притягивании
+        if (snapTarget == db && snapSource != null && isSnapping) {
+            canvas.drawRoundRect(rect, BLOCK_RADIUS, BLOCK_RADIUS, snapPaint);
         }
 
         String branchType = String.valueOf(db.model.getProperties().getOrDefault("_branch_type", ""));
@@ -711,6 +844,7 @@ public class BlockCanvasView extends View {
             }
         }
 
+        // Дочерние блоки (не контейнеры)
         if (!db.model.getChildrenIds().isEmpty() && !db.model.isContainerBlock()) {
             float cy=db.y+h+8,cx=db.x+CHILD_INDENT;int idx=0;
             for(int cid:db.model.getChildrenIds()){
@@ -786,9 +920,33 @@ public class BlockCanvasView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         gestureDetector.onTouchEvent(event);
 
-        float wx=toWorldX(event.getX()),wy=toWorldY(event.getY());
+        float wx = toWorldX(event.getX()), wy = toWorldY(event.getY());
         switch(event.getActionMasked()){
             case MotionEvent.ACTION_DOWN:
+                // Проверка клика по выпадающему списку
+                if (showDropDown && dropDownRect != null && dropDownRect.contains(wx, wy)) {
+                    float itemH = 30;
+                    int index = (int) ((wy - dropDownRect.top) / itemH);
+                    List<String> options = dropDownBlock.model.getDroplistOptions();
+                    if (index >= 0 && index < options.size()) {
+                        dropDownBlock.model.setDroplistSelected(options.get(index));
+                        dropDownBlock.model.getProperties().put("_droplist_selected", options.get(index));
+                        invalidate();
+                    }
+                    showDropDown = false;
+                    dropDownBlock = null;
+                    dropDownRect = null;
+                    return true;
+                }
+
+                // Клик вне списка — закрываем
+                if (showDropDown) {
+                    showDropDown = false;
+                    dropDownBlock = null;
+                    dropDownRect = null;
+                    invalidate();
+                }
+
                 if(showContextMenu){
                     String action = getContextMenuAction(event.getX(), event.getY());
                     if("delete".equals(action) && contextMenuBlock != null) {
@@ -833,9 +991,9 @@ public class BlockCanvasView extends View {
                 }
                 DrawableBlock hit=findBlockAt(wx,wy);
                 if(hit!=null){
-                    // Проверка клика по выпадающему списку
+                    // Проверка клика по выпадающему списку блока
                     if (hit.dropListRect != null && hit.dropListRect.contains(wx, wy)) {
-                        showDropListMenu(hit);
+                        showDropDownMenu(hit);
                         return true;
                     }
 
@@ -880,11 +1038,16 @@ public class BlockCanvasView extends View {
                     return true;
                 }
                 if(isDraggingBlock&&draggingBlock!=null){
-                    draggingBlock.x=clampX(wx-dragOffsetX);
-                    draggingBlock.y=clampY(wy-dragOffsetY);
-                    draggingBlock.model.getPosition().put("x",(double)draggingBlock.x);
-                    draggingBlock.model.getPosition().put("y",(double)draggingBlock.y);
-                    checkNesting(draggingBlock,wx,wy);
+                    float newX = clampX(wx - dragOffsetX);
+                    float newY = clampY(wy - dragOffsetY);
+
+                    draggingBlock.x = newX;
+                    draggingBlock.y = newY;
+                    draggingBlock.model.getPosition().put("x", (double)draggingBlock.x);
+                    draggingBlock.model.getPosition().put("y", (double)draggingBlock.y);
+
+                    checkNesting(draggingBlock, wx, wy);
+                    checkSnapping(draggingBlock);
                     invalidate();
                     return true;
                 }
@@ -930,18 +1093,50 @@ public class BlockCanvasView extends View {
         return super.onTouchEvent(event);
     }
 
-    private void resetState(){
-        isDraggingBlock=false;
-        isDraggingConnection=false;
-        isPanning=false;
-        draggingBlock=null;
-        connectionSource=null;
-        dragStartPort=null;
-        tempLineStart=null;
-        tempLineEnd=null;
-        nestTarget=null;
-        swapTarget=null;
-        nestingReady=false;
+    private void resetState() {
+        isDraggingBlock = false;
+        isDraggingConnection = false;
+        isPanning = false;
+        draggingBlock = null;
+        connectionSource = null;
+        dragStartPort = null;
+        tempLineStart = null;
+        tempLineEnd = null;
+        nestTarget = null;
+        swapTarget = null;
+        nestingReady = false;
+        snapSource = null;
+        snapTarget = null;
+        snapDirection = null;
+        isSnapping = false;
+    }
+
+    private void handleDrop() {
+        if (swapTarget != null && draggingBlock != null) {
+            swapChildren(draggingBlock, swapTarget);
+        } else if (nestTarget != null && nestingReady && draggingBlock != null) {
+            nestBlock(draggingBlock.id, nestTarget.id);
+        } else if (isSnapping && snapSource != null && snapTarget != null && canvasChangeListener != null) {
+            if ("right_to_left".equals(snapDirection)) {
+                canvasChangeListener.onConnectionCreated(
+                        snapSource.id, "output", snapTarget.id, "input"
+                );
+            } else if ("left_to_right".equals(snapDirection)) {
+                canvasChangeListener.onConnectionCreated(
+                        snapTarget.id, "output", snapSource.id, "input"
+                );
+            }
+        } else if (draggingBlock != null && draggingBlock.model.getParentId() != null) {
+            invalidate();
+        }
+
+        snapSource = null;
+        snapTarget = null;
+        snapDirection = null;
+        isSnapping = false;
+        nestTarget = null;
+        swapTarget = null;
+        nestingReady = false;
     }
 
     private void checkNesting(DrawableBlock dragged, float wx, float wy) {
@@ -1001,71 +1196,58 @@ public class BlockCanvasView extends View {
         nestingReady = false;
     }
 
-    private void handleDrop(){
-        if(swapTarget!=null&&draggingBlock!=null){
-            swapChildren(draggingBlock,swapTarget);
-        } else if(nestTarget!=null&&nestingReady&&draggingBlock!=null){
-            nestBlock(draggingBlock.id,nestTarget.id);
-        } else if(draggingBlock!=null&&draggingBlock.model.getParentId()!=null){
-            invalidate();
-        }
-        nestTarget=null;
-        swapTarget=null;
-        nestingReady=false;
-    }
-
-    private DrawableBlock findBlockAt(float x,float y){
-        List<DrawableBlock> rev=new ArrayList<>(blocks.values());
+    private DrawableBlock findBlockAt(float x, float y) {
+        List<DrawableBlock> rev = new ArrayList<>(blocks.values());
         Collections.reverse(rev);
-        for(DrawableBlock db:rev){
-            if(x>=db.x&&x<=db.x+getBlockWidth(db)&&y>=db.y&&y<=db.y+getBlockHeight(db))
+        for (DrawableBlock db : rev) {
+            if (x >= db.x && x <= db.x + getBlockWidth(db) && y >= db.y && y <= db.y + getBlockHeight(db))
                 return db;
         }
         return null;
     }
 
-    private PortHit findPortAt(float x,float y){
-        for(DrawableBlock db:blocks.values()){
-            float w=getBlockWidth(db),h=getBlockHeight(db);
-            if(Math.hypot(x-db.x,y-(db.y+h/2))<=PORT_RADIUS*2.5f)
-                return new PortHit(db,"input");
-            if(Math.hypot(x-(db.x+w),y-(db.y+h/2))<=PORT_RADIUS*2.5f)
-                return new PortHit(db,"output");
+    private PortHit findPortAt(float x, float y) {
+        for (DrawableBlock db : blocks.values()) {
+            float w = getBlockWidth(db), h = getBlockHeight(db);
+            if (Math.hypot(x - db.x, y - (db.y + h / 2)) <= PORT_RADIUS * 2.5f)
+                return new PortHit(db, "input");
+            if (Math.hypot(x - (db.x + w), y - (db.y + h / 2)) <= PORT_RADIUS * 2.5f)
+                return new PortHit(db, "output");
         }
         return null;
     }
 
-    private PointF getPortPos(DrawableBlock db,String port){
-        return "input".equals(port)?new PointF(db.x,db.y+getBlockHeight(db)/2):new PointF(db.x+getBlockWidth(db),db.y+getBlockHeight(db)/2);
+    private PointF getPortPos(DrawableBlock db, String port) {
+        return "input".equals(port) ? new PointF(db.x, db.y + getBlockHeight(db) / 2) : new PointF(db.x + getBlockWidth(db), db.y + getBlockHeight(db) / 2);
     }
 
-    private boolean isCollapseBtn(float wx,float wy,DrawableBlock db){
-        float cx=db.x+getBlockWidth(db)-16,cy=db.y+10;
-        return Math.hypot(wx-cx,wy-cy)<=12&&!db.model.getChildrenIds().isEmpty();
+    private boolean isCollapseBtn(float wx, float wy, DrawableBlock db) {
+        float cx = db.x + getBlockWidth(db) - 16, cy = db.y + 10;
+        return Math.hypot(wx - cx, wy - cy) <= 12 && !db.model.getChildrenIds().isEmpty();
     }
 
-    private float spacing(MotionEvent e){
-        float x=e.getX(0)-e.getX(1),y=e.getY(0)-e.getY(1);
-        return (float)Math.sqrt(x*x+y*y);
+    private float spacing(MotionEvent e) {
+        float x = e.getX(0) - e.getX(1), y = e.getY(0) - e.getY(1);
+        return (float) Math.sqrt(x * x + y * y);
     }
 
-    private float getBlockWidth(DrawableBlock db){
-        return db.model.getSize().getOrDefault("width",150.0).floatValue();
+    private float getBlockWidth(DrawableBlock db) {
+        return db.model.getSize().getOrDefault("width", 150.0).floatValue();
     }
 
-    private float getBlockHeight(DrawableBlock db){
-        return db.model.getSize().getOrDefault("height",80.0).floatValue();
+    private float getBlockHeight(DrawableBlock db) {
+        return db.model.getSize().getOrDefault("height", 80.0).floatValue();
     }
 
-    private float toWorldX(float sx){ return (sx-panX)/scaleFactor; }
-    private float toWorldY(float sy){ return (sy-panY)/scaleFactor; }
-    private int parseColor(String c){
-        try{ return Color.parseColor(c); }
-        catch(Exception e){ return 0xFF3498db; }
+    private float toWorldX(float sx) { return (sx - panX) / scaleFactor; }
+    private float toWorldY(float sy) { return (sy - panY) / scaleFactor; }
+    private int parseColor(String c) {
+        try { return Color.parseColor(c); }
+        catch (Exception e) { return 0xFF3498db; }
     }
-    private int darken(int c){
-        float f=0.8f;
-        return Color.argb(Color.alpha(c),(int)(Color.red(c)*f),(int)(Color.green(c)*f),(int)(Color.blue(c)*f));
+    private int darken(int c) {
+        float f = 0.8f;
+        return Color.argb(Color.alpha(c), (int)(Color.red(c) * f), (int)(Color.green(c) * f), (int)(Color.blue(c) * f));
     }
 
     public static class DrawableBlock {
@@ -1085,7 +1267,7 @@ public class BlockCanvasView extends View {
     private static class PortHit {
         DrawableBlock block;
         String port;
-        PortHit(DrawableBlock b,String p){block=b;port=p;}
+        PortHit(DrawableBlock b, String p) { block = b; port = p; }
     }
 
     public interface OnBlockClickListener { void onBlockClick(BlockModel block); }

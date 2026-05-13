@@ -1,9 +1,4 @@
 
----
-
-## Файл 2: `docs/README.ru.md` (Русская версия)
-
-```markdown
 <p align="center">
   <img src="../app/src/main/res/drawable/abstract_logo.png" width="128" alt="Abstract IDE Logo">
 </p>
