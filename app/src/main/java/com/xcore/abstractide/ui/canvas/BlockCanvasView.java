@@ -17,7 +17,7 @@ public class BlockCanvasView extends View {
     private static final float BLOCK_RADIUS = 10f;
     private static final float PORT_RADIUS = 6f;
     private static final float HEADER_HEIGHT = 24f;
-    private static final float NEST_HOVER_DELAY = 800f;
+    private static final float NEST_HOVER_DELAY = 200f;
     private static final float CHILD_INDENT = 25f;
     private static final float ZOOM_MIN = 0.1f;
     private static final float ZOOM_MAX = 5.0f;
@@ -132,7 +132,6 @@ public class BlockCanvasView extends View {
         snapPaint.setStyle(Paint.Style.STROKE);
         snapPaint.setStrokeWidth(4);
 
-        // DropDown paints
         dropDownBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         dropDownBgPaint.setColor(0xEE2d2d2d);
         dropDownItemPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -230,7 +229,6 @@ public class BlockCanvasView extends View {
             float distY = Math.abs(draggedCenterY - dbCenterY);
             boolean yOverlap = (draggedBottom > dbTop && draggedTop < dbBottom);
 
-            // Правый край dragged к левому краю db
             if (distX < SNAP_DISTANCE && (distY < 50f || yOverlap)) {
                 snapSource = dragged;
                 snapTarget = db;
@@ -244,7 +242,6 @@ public class BlockCanvasView extends View {
                 return;
             }
 
-            // Левый край dragged к правому краю db
             distX = Math.abs(draggedLeft - dbRight);
 
             if (distX < SNAP_DISTANCE && (distY < 50f || yOverlap)) {
@@ -499,7 +496,6 @@ public class BlockCanvasView extends View {
             }
         }
 
-        // Отрисовка выпадающего списка
         if (showDropDown && dropDownBlock != null && dropDownRect != null) {
             List<String> options = dropDownBlock.model.getDroplistOptions();
             if (options != null) {
@@ -578,7 +574,6 @@ public class BlockCanvasView extends View {
         String type = db.model.getType() != null ? db.model.getType().getSubclassName() : "";
         if (!type.isEmpty()) canvas.drawText(type, db.x + 10, db.y + HEADER_HEIGHT + 16, smallTextPaint);
 
-        // Отрисовка выпадающего списка (если у блока есть droplist)
         if (db.model.isDroplistBlock() && db.model.getDroplistOptions() != null && !db.model.getDroplistOptions().isEmpty()) {
             String selected = db.model.getDroplistSelected();
             if (selected == null && !db.model.getDroplistOptions().isEmpty()) {
@@ -595,12 +590,10 @@ public class BlockCanvasView extends View {
             buttonPaint.setColor(0xFF2c3e50);
             buttonPaint.setStyle(Paint.Style.FILL);
             canvas.drawRoundRect(db.dropListRect, 4, 4, buttonPaint);
-
             buttonPaint.setColor(0xFF555555);
             buttonPaint.setStyle(Paint.Style.STROKE);
             buttonPaint.setStrokeWidth(1);
             canvas.drawRoundRect(db.dropListRect, 4, 4, buttonPaint);
-
             smallTextPaint.setColor(0xFFecf0f1);
             smallTextPaint.setTextSize(10f * getResources().getDisplayMetrics().density);
             String displayText = selected.length() > 8 ? selected.substring(0, 6) + ".." : selected;
@@ -616,11 +609,9 @@ public class BlockCanvasView extends View {
             buttonPaint.setColor(0xFF95a5a6);
             buttonPaint.setStyle(Paint.Style.FILL);
             canvas.drawPath(arrow, buttonPaint);
-
             smallTextPaint.setTextSize(9f * getResources().getDisplayMetrics().density);
         }
 
-        // Подсветка при притягивании
         if (snapTarget == db && snapSource != null && isSnapping) {
             canvas.drawRoundRect(rect, BLOCK_RADIUS, BLOCK_RADIUS, snapPaint);
         }
@@ -844,75 +835,76 @@ public class BlockCanvasView extends View {
             }
         }
 
-        // Дочерние блоки (не контейнеры)
-        if (!db.model.getChildrenIds().isEmpty() && !db.model.isContainerBlock()) {
-            float cy=db.y+h+8,cx=db.x+CHILD_INDENT;int idx=0;
-            for(int cid:db.model.getChildrenIds()){
-                DrawableBlock child=blocks.get(cid);
-                if(child!=null && !"case".equals(child.model.getProperties().get("_branch_type"))){
-                    float cw=getBlockWidth(child),ch2=getBlockHeight(child);
-                    child.x=cx;
-                    child.y=cy;
-                    child.model.getPosition().put("x",(double)cx);
-                    child.model.getPosition().put("y",(double)cy);
-                    blockPaint.setColor(idx%2==0?0x18000000:0x10000000);
+        // ✅ ДОЧЕРНИЕ БЛОКИ (с отступом и нумерацией) — ДЛЯ ЛЮБЫХ БЛОКОВ (из первого файла)
+        if (!db.model.getChildrenIds().isEmpty()) {
+            float cy = db.y + h + 8, cx = db.x + CHILD_INDENT;
+            int idx = 0;
+            for (int cid : db.model.getChildrenIds()) {
+                DrawableBlock child = blocks.get(cid);
+                if (child != null && !"case".equals(child.model.getProperties().get("_branch_type"))) {
+                    float cw = getBlockWidth(child), ch2 = getBlockHeight(child);
+                    child.x = cx;
+                    child.y = cy;
+                    child.model.getPosition().put("x", (double) cx);
+                    child.model.getPosition().put("y", (double) cy);
+                    blockPaint.setColor(idx % 2 == 0 ? 0x18000000 : 0x10000000);
                     blockPaint.setStyle(Paint.Style.FILL);
-                    canvas.drawRoundRect(new RectF(cx-5,cy-2,cx+cw+40,cy+ch2+2),6,6,blockPaint);
+                    canvas.drawRoundRect(new RectF(cx - 5, cy - 2, cx + cw + 40, cy + ch2 + 2), 6, 6, blockPaint);
                     smallTextPaint.setColor(0xFF888888);
-                    canvas.drawText((idx+1)+".",cx-18,cy+ch2/2+4,smallTextPaint);
-                    drawBlock(canvas,child);
+                    canvas.drawText((idx + 1) + ".", cx - 18, cy + ch2 / 2 + 4, smallTextPaint);
+                    drawBlock(canvas, child);
                     idx++;
-                    cy+=ch2+4;
+                    cy += ch2 + 4;
                 }
             }
         }
 
         if (!db.model.getChildrenIds().isEmpty()) {
             smallTextPaint.setColor(0xFF888888);
-            canvas.drawText("🏠"+db.model.getChildrenIds().size(),db.x+6,db.y+HEADER_HEIGHT-6,smallTextPaint);
+            canvas.drawText("🏠" + db.model.getChildrenIds().size(), db.x + 6, db.y + HEADER_HEIGHT - 6, smallTextPaint);
         }
         if (!db.model.getChildrenIds().isEmpty()) {
-            boolean col=collapsedBlocks.contains(db.id);
+            boolean col = collapsedBlocks.contains(db.id);
             buttonPaint.setColor(0xFF3a3a3a);
-            canvas.drawCircle(db.x+w-16,db.y+10,8,buttonPaint);
+            canvas.drawCircle(db.x + w - 16, db.y + 10, 8, buttonPaint);
             smallTextPaint.setColor(0xFFcccccc);
-            canvas.drawText(col?"+":"−",db.x+w-20,db.y+14,smallTextPaint);
+            canvas.drawText(col ? "+" : "−", db.x + w - 20, db.y + 14, smallTextPaint);
         }
-        if (db.selected) canvas.drawRoundRect(new RectF(rect.left-2,rect.top-2,rect.right+2,rect.bottom+2),BLOCK_RADIUS+2,BLOCK_RADIUS+2,selectionPaint);
-        if (db==nestTarget&&draggingBlock!=null&&db!=swapTarget){
-            nestPaint.setColor(nestingReady?NEST_READY_COLOR:Color.argb((int)(80+175*Math.min(1f,(System.currentTimeMillis()-nestHoverStart)/NEST_HOVER_DELAY)),46,204,113));
-            nestPaint.setPathEffect(new DashPathEffect(new float[]{10,5},0));
-            canvas.drawRoundRect(new RectF(rect.left-8,rect.top-8,rect.right+8,rect.bottom+8),BLOCK_RADIUS+8,BLOCK_RADIUS+8,nestPaint);
+        if (db.selected) canvas.drawRoundRect(new RectF(rect.left - 2, rect.top - 2, rect.right + 2, rect.bottom + 2), BLOCK_RADIUS + 2, BLOCK_RADIUS + 2, selectionPaint);
+        if (db == nestTarget && draggingBlock != null && db != swapTarget) {
+            nestPaint.setColor(nestingReady ? NEST_READY_COLOR : Color.argb((int) (80 + 175 * Math.min(1f, (System.currentTimeMillis() - nestHoverStart) / NEST_HOVER_DELAY)), 46, 204, 113));
+            nestPaint.setPathEffect(new DashPathEffect(new float[]{10, 5}, 0));
+            canvas.drawRoundRect(new RectF(rect.left - 8, rect.top - 8, rect.right + 8, rect.bottom + 8), BLOCK_RADIUS + 8, BLOCK_RADIUS + 8, nestPaint);
             nestPaint.setPathEffect(null);
-            smallTextPaint.setColor(nestingReady?NEST_READY_COLOR:0xFFaaaaaa);
-            canvas.drawText(nestingReady?"▼ RELEASE TO NEST ▼":"▼ HOLD TO NEST ▼",db.x+w/2-80,db.y-12,smallTextPaint);
+            smallTextPaint.setColor(nestingReady ? NEST_READY_COLOR : 0xFFaaaaaa);
+            canvas.drawText(nestingReady ? "▼ RELEASE TO NEST ▼" : "▼ HOLD TO NEST ▼", db.x + w / 2 - 80, db.y - 12, smallTextPaint);
         }
-        if (db==swapTarget&&draggingBlock!=null){
-            swapPaint.setPathEffect(new DashPathEffect(new float[]{6,3},0));
-            canvas.drawRoundRect(new RectF(rect.left-4,rect.top-4,rect.right+4,rect.bottom+4),BLOCK_RADIUS+4,BLOCK_RADIUS+4,swapPaint);
+        if (db == swapTarget && draggingBlock != null) {
+            swapPaint.setPathEffect(new DashPathEffect(new float[]{6, 3}, 0));
+            canvas.drawRoundRect(new RectF(rect.left - 4, rect.top - 4, rect.right + 4, rect.bottom + 4), BLOCK_RADIUS + 4, BLOCK_RADIUS + 4, swapPaint);
             swapPaint.setPathEffect(null);
             smallTextPaint.setColor(SWAP_COLOR);
-            canvas.drawText("⇄ SWAP",db.x+w/2-25,db.y-8,smallTextPaint);
+            canvas.drawText("⇄ SWAP", db.x + w / 2 - 25, db.y - 8, smallTextPaint);
         }
     }
 
     private void drawConnection(Canvas canvas, DrawableBlock from, DrawableBlock to) {
-        float fw=getBlockWidth(from),fh=getBlockHeight(from),tw=getBlockWidth(to),th=getBlockHeight(to);
-        PointF s=new PointF(from.x+fw,from.y+fh/2),e=new PointF(to.x,to.y+th/2);
+        float fw = getBlockWidth(from), fh = getBlockHeight(from), tw = getBlockWidth(to), th = getBlockHeight(to);
+        PointF s = new PointF(from.x + fw, from.y + fh / 2), e = new PointF(to.x, to.y + th / 2);
         connectionPath.reset();
-        connectionPath.moveTo(s.x,s.y);
-        float dx=e.x-s.x;
-        connectionPath.cubicTo(s.x+dx*0.4f,s.y,e.x-dx*0.4f,e.y,e.x,e.y);
-        canvas.drawPath(connectionPath,connectionPaint);
-        float ang=(float)Math.atan2(e.y-s.y,e.x-s.x),sz=12,sw=6;
-        Path arrow=new Path();
-        arrow.moveTo(e.x,e.y);
-        arrow.lineTo(e.x-sz*(float)Math.cos(ang-0.4f),e.y-sz*(float)Math.sin(ang-0.4f));
-        arrow.lineTo(e.x-sw*(float)Math.cos(ang+Math.PI/2),e.y-sw*(float)Math.sin(ang+Math.PI/2));
-        arrow.lineTo(e.x-sz*(float)Math.cos(ang+0.4f),e.y-sz*(float)Math.sin(ang+0.4f));
+        connectionPath.moveTo(s.x, s.y);
+        float dx = e.x - s.x;
+        connectionPath.cubicTo(s.x + dx * 0.4f, s.y, e.x - dx * 0.4f, e.y, e.x, e.y);
+        canvas.drawPath(connectionPath, connectionPaint);
+        float ang = (float) Math.atan2(e.y - s.y, e.x - s.x), sz = 12, sw = 6;
+        Path arrow = new Path();
+        arrow.moveTo(e.x, e.y);
+        arrow.lineTo(e.x - sz * (float) Math.cos(ang - 0.4f), e.y - sz * (float) Math.sin(ang - 0.4f));
+        arrow.lineTo(e.x - sw * (float) Math.cos(ang + Math.PI / 2), e.y - sw * (float) Math.sin(ang + Math.PI / 2));
+        arrow.lineTo(e.x - sz * (float) Math.cos(ang + 0.4f), e.y - sz * (float) Math.sin(ang + 0.4f));
         arrow.close();
         connectionPaint.setStyle(Paint.Style.FILL);
-        canvas.drawPath(arrow,connectionPaint);
+        canvas.drawPath(arrow, connectionPaint);
         connectionPaint.setStyle(Paint.Style.STROKE);
     }
 
@@ -921,9 +913,8 @@ public class BlockCanvasView extends View {
         gestureDetector.onTouchEvent(event);
 
         float wx = toWorldX(event.getX()), wy = toWorldY(event.getY());
-        switch(event.getActionMasked()){
+        switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                // Проверка клика по выпадающему списку
                 if (showDropDown && dropDownRect != null && dropDownRect.contains(wx, wy)) {
                     float itemH = 30;
                     int index = (int) ((wy - dropDownRect.top) / itemH);
@@ -939,7 +930,6 @@ public class BlockCanvasView extends View {
                     return true;
                 }
 
-                // Клик вне списка — закрываем
                 if (showDropDown) {
                     showDropDown = false;
                     dropDownBlock = null;
@@ -947,20 +937,20 @@ public class BlockCanvasView extends View {
                     invalidate();
                 }
 
-                if(showContextMenu){
+                if (showContextMenu) {
                     String action = getContextMenuAction(event.getX(), event.getY());
-                    if("delete".equals(action) && contextMenuBlock != null) {
+                    if ("delete".equals(action) && contextMenuBlock != null) {
                         removeBlock(contextMenuBlock.id);
-                        if(canvasChangeListener != null)
+                        if (canvasChangeListener != null)
                             canvasChangeListener.onBlockDelete(contextMenuBlock.id);
                         hideContextMenu();
                         return true;
-                    } else if("exit".equals(action) && contextMenuBlock != null && contextMenuBlock.model.getParentId() != null) {
+                    } else if ("exit".equals(action) && contextMenuBlock != null && contextMenuBlock.model.getParentId() != null) {
                         DrawableBlock parent = blocks.get(contextMenuBlock.model.getParentId());
-                        if(parent != null) {
-                            parent.model.getChildrenIds().remove((Integer)contextMenuBlock.id);
+                        if (parent != null) {
+                            parent.model.getChildrenIds().remove((Integer) contextMenuBlock.id);
                             contextMenuBlock.model.setParentId(null);
-                            if(canvasChangeListener != null)
+                            if (canvasChangeListener != null)
                                 canvasChangeListener.onBlockNested(contextMenuBlock.id, -1);
                         }
                         hideContextMenu();
@@ -969,29 +959,29 @@ public class BlockCanvasView extends View {
                     hideContextMenu();
                     return true;
                 }
-                long now=System.currentTimeMillis();
-                if(now-lastClickTime<DOUBLE_CLICK_INTERVAL){
-                    DrawableBlock dblHit=findBlockAt(wx,wy);
-                    if(dblHit != null){
-                        showContextMenuForBlock(dblHit,event.getX(),event.getY());
-                        lastClickTime=0;
+                long now = System.currentTimeMillis();
+                if (now - lastClickTime < DOUBLE_CLICK_INTERVAL) {
+                    DrawableBlock dblHit = findBlockAt(wx, wy);
+                    if (dblHit != null) {
+                        showContextMenuForBlock(dblHit, event.getX(), event.getY());
+                        lastClickTime = 0;
                         return true;
                     }
                 }
-                lastClickTime=now;
-                lastTouchX=event.getX();lastTouchY=event.getY();
-                PortHit ph=findPortAt(wx,wy);
-                if(ph!=null){
-                    isDraggingConnection=true;
-                    connectionSource=ph.block;
-                    dragStartPort=ph.port;
-                    tempLineStart=getPortPos(ph.block,ph.port);
-                    tempLineEnd=new PointF(wx,wy);
+                lastClickTime = now;
+                lastTouchX = event.getX();
+                lastTouchY = event.getY();
+                PortHit ph = findPortAt(wx, wy);
+                if (ph != null) {
+                    isDraggingConnection = true;
+                    connectionSource = ph.block;
+                    dragStartPort = ph.port;
+                    tempLineStart = getPortPos(ph.block, ph.port);
+                    tempLineEnd = new PointF(wx, wy);
                     return true;
                 }
-                DrawableBlock hit=findBlockAt(wx,wy);
-                if(hit!=null){
-                    // Проверка клика по выпадающему списку блока
+                DrawableBlock hit = findBlockAt(wx, wy);
+                if (hit != null) {
                     if (hit.dropListRect != null && hit.dropListRect.contains(wx, wy)) {
                         showDropDownMenu(hit);
                         return true;
@@ -1004,87 +994,87 @@ public class BlockCanvasView extends View {
                             return true;
                         }
                     }
-                    if(isCollapseBtn(wx,wy,hit)){
+                    if (isCollapseBtn(wx, wy, hit)) {
                         toggleCollapse(hit.id);
                         return true;
                     }
-                    isDraggingBlock=true;
-                    draggingBlock=hit;
-                    dragOffsetX=wx-hit.x;
-                    dragOffsetY=wy-hit.y;
-                    for(DrawableBlock db:blocks.values()) db.selected=(db==hit);
-                    if(blockClickListener!=null) blockClickListener.onBlockClick(hit.model);
+                    isDraggingBlock = true;
+                    draggingBlock = hit;
+                    dragOffsetX = wx - hit.x;
+                    dragOffsetY = wy - hit.y;
+                    for (DrawableBlock db : blocks.values()) db.selected = (db == hit);
+                    if (blockClickListener != null) blockClickListener.onBlockClick(hit.model);
                     return true;
                 }
-                isPanning=true;
+                isPanning = true;
                 return true;
             case MotionEvent.ACTION_POINTER_DOWN:
-                if(event.getPointerCount()==2){
-                    initialSpan=spacing(event);
+                if (event.getPointerCount() == 2) {
+                    initialSpan = spacing(event);
                 }
                 return true;
             case MotionEvent.ACTION_MOVE:
-                if(event.getPointerCount()==2){
-                    float ns=spacing(event);
-                    scaleFactor*=ns/initialSpan;
-                    scaleFactor=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,scaleFactor));
-                    initialSpan=ns;
+                if (event.getPointerCount() == 2) {
+                    float ns = spacing(event);
+                    scaleFactor *= ns / initialSpan;
+                    scaleFactor = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scaleFactor));
+                    initialSpan = ns;
                     invalidate();
                     return true;
                 }
-                if(isDraggingConnection){
-                    tempLineEnd=new PointF(wx,wy);
+                if (isDraggingConnection) {
+                    tempLineEnd = new PointF(wx, wy);
                     invalidate();
                     return true;
                 }
-                if(isDraggingBlock&&draggingBlock!=null){
+                if (isDraggingBlock && draggingBlock != null) {
                     float newX = clampX(wx - dragOffsetX);
                     float newY = clampY(wy - dragOffsetY);
 
                     draggingBlock.x = newX;
                     draggingBlock.y = newY;
-                    draggingBlock.model.getPosition().put("x", (double)draggingBlock.x);
-                    draggingBlock.model.getPosition().put("y", (double)draggingBlock.y);
+                    draggingBlock.model.getPosition().put("x", (double) draggingBlock.x);
+                    draggingBlock.model.getPosition().put("y", (double) draggingBlock.y);
 
                     checkNesting(draggingBlock, wx, wy);
                     checkSnapping(draggingBlock);
                     invalidate();
                     return true;
                 }
-                if(isPanning){
-                    panX+=event.getX()-lastTouchX;
-                    panY+=event.getY()-lastTouchY;
+                if (isPanning) {
+                    panX += event.getX() - lastTouchX;
+                    panY += event.getY() - lastTouchY;
                     clampPan();
-                    lastTouchX=event.getX();
-                    lastTouchY=event.getY();
+                    lastTouchX = event.getX();
+                    lastTouchY = event.getY();
                     invalidate();
                     return true;
                 }
                 break;
             case MotionEvent.ACTION_UP:
-                if(isDraggingConnection){
-                    PortHit tgt=findPortAt(wx,wy);
-                    if(tgt!=null&&connectionSource!=null&&tgt.block!=connectionSource){
-                        String fp=dragStartPort,tp=tgt.port;
-                        DrawableBlock fb=connectionSource,tb=tgt.block;
-                        if("input".equals(fp)&&"output".equals(tp)){
-                            DrawableBlock tmp=fb;
-                            fb=tb;
-                            tb=tmp;
-                            fp="output";
-                            tp="input";
+                if (isDraggingConnection) {
+                    PortHit tgt = findPortAt(wx, wy);
+                    if (tgt != null && connectionSource != null && tgt.block != connectionSource) {
+                        String fp = dragStartPort, tp = tgt.port;
+                        DrawableBlock fb = connectionSource, tb = tgt.block;
+                        if ("input".equals(fp) && "output".equals(tp)) {
+                            DrawableBlock tmp = fb;
+                            fb = tb;
+                            tb = tmp;
+                            fp = "output";
+                            tp = "input";
                         }
-                        if("output".equals(fp)&&"input".equals(tp)&&canvasChangeListener!=null)
-                            canvasChangeListener.onConnectionCreated(fb.id,fp,tb.id,tp);
+                        if ("output".equals(fp) && "input".equals(tp) && canvasChangeListener != null)
+                            canvasChangeListener.onConnectionCreated(fb.id, fp, tb.id, tp);
                     }
                     resetState();
                     invalidate();
                     return true;
                 }
-                if(isDraggingBlock&&draggingBlock!=null){
+                if (isDraggingBlock && draggingBlock != null) {
                     handleDrop();
-                    if(canvasChangeListener!=null)
-                        canvasChangeListener.onBlockMoved(draggingBlock.id,draggingBlock.x,draggingBlock.y);
+                    if (canvasChangeListener != null)
+                        canvasChangeListener.onBlockMoved(draggingBlock.id, draggingBlock.x, draggingBlock.y);
                 }
                 resetState();
                 invalidate();
@@ -1156,39 +1146,17 @@ public class BlockCanvasView extends View {
                 }
             }
 
-            String branchType = String.valueOf(db.model.getProperties().getOrDefault("_branch_type", ""));
-
-            if ("case".equals(branchType)) {
-                float cellX = db.x + w + 10;
-                float cellY = db.y + 8;
-                float cellW = 100;
-                float cellH = h - 16;
-
-                if (wx >= cellX && wx <= cellX + cellW && wy >= cellY && wy <= cellY + cellH) {
-                    if (!wouldCreateCycle(dragged, db)) {
-                        nestTarget = db;
-                        if (nestHoverStart == 0 || nestTarget != db) {
-                            nestHoverStart = System.currentTimeMillis();
-                            nestingReady = false;
-                        } else if (System.currentTimeMillis() - nestHoverStart > NEST_HOVER_DELAY) {
-                            nestingReady = true;
-                        }
-                        return;
+            // ВЛОЖЕНИЕ В ЛЮБОЙ БЛОК (из первого файла)
+            if (wx >= db.x && wx <= db.x + w && wy >= db.y && wy <= db.y + h) {
+                if (!wouldCreateCycle(dragged, db)) {
+                    nestTarget = db;
+                    if (nestHoverStart == 0 || nestTarget != db) {
+                        nestHoverStart = System.currentTimeMillis();
+                        nestingReady = false;
+                    } else if (System.currentTimeMillis() - nestHoverStart > NEST_HOVER_DELAY) {
+                        nestingReady = true;
                     }
-                }
-            }
-            else if (db.model.isContainerBlock()) {
-                if (wx >= db.x && wx <= db.x + w && wy >= db.y && wy <= db.y + h) {
-                    if (!wouldCreateCycle(dragged, db)) {
-                        nestTarget = db;
-                        if (nestHoverStart == 0 || nestTarget != db) {
-                            nestHoverStart = System.currentTimeMillis();
-                            nestingReady = false;
-                        } else if (System.currentTimeMillis() - nestHoverStart > NEST_HOVER_DELAY) {
-                            nestingReady = true;
-                        }
-                        return;
-                    }
+                    return;
                 }
             }
         }
@@ -1247,7 +1215,7 @@ public class BlockCanvasView extends View {
     }
     private int darken(int c) {
         float f = 0.8f;
-        return Color.argb(Color.alpha(c), (int)(Color.red(c) * f), (int)(Color.green(c) * f), (int)(Color.blue(c) * f));
+        return Color.argb(Color.alpha(c), (int) (Color.red(c) * f), (int) (Color.green(c) * f), (int) (Color.blue(c) * f));
     }
 
     public static class DrawableBlock {
